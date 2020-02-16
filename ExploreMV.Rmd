@@ -1,0 +1,19 @@
+---
+title: "ExploreMV"
+author: "James Millington"
+date: "16/02/2020"
+output: github_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Email from Kris, 2020-02-10
+
+> The FIRMS fire data (MODIS C6 & VIIRS) for 20 Jan 2012 (date VIIRS data became available from) to 30 Nov 2019 can be found at: `Data/URLs/REF2`
+
+> There are separate zip folders for MODIS and VIIRS. Note also, though the data is shp, there were options for outputs as csvs or jsons. I used the same extent as I’ve been running for LandTrendr (covering all the Páramos of Boyacá).
+
+
