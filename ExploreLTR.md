@@ -31,8 +31,7 @@ dat <- stack("Data/LTGEE20012020.tif")
 names(dat)
 ```
 
-    ## [1] "LTGEE20012020.1" "LTGEE20012020.2" "LTGEE20012020.3" "LTGEE20012020.4"
-    ## [5] "LTGEE20012020.5" "LTGEE20012020.6"
+    ## [1] "yod"    "mag"    "dur"    "preval" "rate"   "dsnr"
 
 ``` r
 names(dat) <- c("Year", "Magnitude", "Duration", "Pre Value", "Spec Chg", "DSNR")
@@ -40,7 +39,7 @@ names(dat) <- c("Year", "Magnitude", "Duration", "Pre Value", "Spec Chg", "DSNR"
 plot(dat)
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
 
 ``` r
 ncell(dat)
@@ -83,7 +82,7 @@ sdat <- calc(sdat, fun=NAize)
 plot(sdat)
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
 There’s no unique fire ID. Add one using `clump` on `Year` layer:
 
@@ -97,7 +96,7 @@ IDs <- clump(sdat[["Year"]])
 plot(IDs)
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 ``` r
 names(IDs) <- "FireID"
@@ -106,7 +105,7 @@ sdat <-stack(sdat, IDs)
 plot(sdat)
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-3-2.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-3-2.png)<!-- -->
 
 Let’s check if this worked. If so, all patches should have a SD of zero
 (because all values within the patch should be identical):
@@ -181,7 +180,7 @@ dat35.yr <- trim(dat35.yr)
 plot(dat35.yr)
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 ``` r
 freq(dat35.yr)
@@ -206,22 +205,17 @@ loop through Years (classes) creating clumps.
 
 Or could we use the `landscapemetrics`
 [package](https://r-spatialecology.github.io/landscapemetrics/index.html).
-Let’s try this package
-    first:
+Let’s try this package first:
 
 ``` r
 library(landscapemetrics)
-```
 
-    ## Warning: package 'landscapemetrics' was built under R version 3.6.2
-
-``` r
 p <- get_patches(sdat[["Year"]])
 
 plot(stack(p))
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 So `get_patches` returns a list of `raster` layers (which can then be
 `stack`ed)
@@ -273,7 +267,7 @@ sdat.utm <- projectRaster(sdat, crs = sr, method="ngb")
 plot(sdat.utm)
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
 And then check landscape
     again:
@@ -282,13 +276,13 @@ And then check landscape
 check_landscape(sdat.utm)
 ```
 
-    ## Warning: Caution: More than 30 land cover-classes - Please check if
-    ## discrete land-cover classes are present.
+    ## Warning: Caution: More than 30 land cover-classes - Please check if discrete
+    ## land-cover classes are present.
 
-    ##   layer       crs units   class n_classes  OK
-    ## 1     1 projected     m integer         6   v
-    ## 2     2 projected     m integer       251 (?)
-    ## 3     3 projected     m integer         1   v
+    ##   layer       crs units   class n_classes OK
+    ## 1     1 projected     m integer         6  ✓
+    ## 2     2 projected     m integer       251  ?⃝
+    ## 3     3 projected     m integer         1  ✓
 
 In this landscape check we see `Year` and `Duration` are fine, but
 `Magnitude` should not be analysed using `landscapemetrics` (due to
@@ -302,14 +296,14 @@ Back to working out how to extract the number of fires in each
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ----------------------------------------------------- tidyverse 1.2.1 --
+    ## ── Attaching packages ──────────────────────────────────────── tidyverse 1.3.0 ──
 
-    ## v ggplot2 3.2.1     v purrr   0.3.3
-    ## v tibble  2.1.3     v dplyr   0.8.3
-    ## v tidyr   1.0.0     v stringr 1.4.0
-    ## v readr   1.3.1     v forcats 0.4.0
+    ## ✓ ggplot2 3.2.1     ✓ purrr   0.3.3
+    ## ✓ tibble  2.1.3     ✓ dplyr   0.8.4
+    ## ✓ tidyr   1.0.2     ✓ stringr 1.4.0
+    ## ✓ readr   1.3.1     ✓ forcats 0.4.0
 
-    ## -- Conflicts -------------------------------------------------------- tidyverse_conflicts() --
+    ## ── Conflicts ─────────────────────────────────────────── tidyverse_conflicts() ──
     ## x tidyr::extract() masks raster::extract()
     ## x dplyr::filter()  masks stats::filter()
     ## x dplyr::lag()     masks stats::lag()
@@ -336,7 +330,7 @@ area
     ##  8     1 patch  2012     8 area      1.16
     ##  9     1 patch  2012     9 area      1.69
     ## 10     1 patch  2012    10 area      1.16
-    ## # ... with 27 more rows
+    ## # … with 27 more rows
 
 ``` r
 #now we can count fires in each year 
@@ -365,7 +359,7 @@ area %>%
     xlab("Year")
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ``` r
 #we can also plot the distribution of area by year
@@ -377,7 +371,7 @@ ggplot(area, aes(Area_ha)) +
 
     ## Warning: Groups with fewer than two data points have been dropped.
 
-![](Explore_files/figure-gfm/unnamed-chunk-13-2.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-13-2.png)<!-- -->
 
 Definding patches by Year as class, we can think about things we might
 want to compare between runs:
@@ -404,7 +398,7 @@ p <- get_patches(sdat.utm[["Year"]])
 plot(stack(p))
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 Remember `get_patches()` returns a raster for each year, restarting
 patch numbering each year. So we need to loop to create unique patch ids
@@ -434,7 +428,7 @@ names(mag.s[[3]]) <- "Patch"
 plot(mag.s)
 ```
 
-![](Explore_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](ExploreLTR_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 With this we can now calculate (zonal) statistics of magnitude by year:
 
