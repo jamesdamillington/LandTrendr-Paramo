@@ -6,8 +6,7 @@ James Millington
 Email from Kris, 2020-01-30
 
 > I’ve rerun what I think should be our baseline settings with the
-> results downloadable from
-> <https://drive.google.com/open?id=1XQvk_JI8cyTH48elFP8HB4m21VdMKZj5>
+> results downloadable from `Data/URLs/REF1`
 
 > Note there are 6 layers:
 > 
