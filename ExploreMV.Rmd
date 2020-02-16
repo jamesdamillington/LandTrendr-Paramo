@@ -2,7 +2,13 @@
 title: "ExploreMV"
 author: "James Millington"
 date: "16/02/2020"
-output: github_document
+output:
+#  pdf_document:
+#    toc: yes
+#  html_document:
+#    toc: yes
+#  always_allow_html: true
+  github_document
 ---
 
 
@@ -10,10 +16,223 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Introduction
+
 Email from Kris, 2020-02-10
 
 > The FIRMS fire data (MODIS C6 & VIIRS) for 20 Jan 2012 (date VIIRS data became available from) to 30 Nov 2019 can be found at: `Data/URLs/REF2`
 
 > There are separate zip folders for MODIS and VIIRS. Note also, though the data is shp, there were options for outputs as csvs or jsons. I used the same extent as I’ve been running for LandTrendr (covering all the Páramos of Boyacá).
+
+The aim here is to load these data and raterise them for comparison with the LandTrendR data (e.g. [ExploreLTR](https://github.com/jamesdamillington/LandTrendr-Paramo/blob/master/ExploreLTR.md)
+
+## Check Data
+
+Try loading MODIS shapefile
+```{r}
+library(sf)
+library(tidyverse)
+
+modis <- st_read("Data/MODIS/fire_archive_M6_103936.shp")
+glimpse(modis)
+plot(modis, max.plot = 16)
+
+```
+
+And plot with interactive map:
+```{r}
+library(mapview)
+
+m <- mapview(modis, zcol=c("FRP","SATELLITE","BRIGHT_T31"), lwd = 0, alpha.regions = 1, cex = 5, map.types=c("Esri.WorldImagery","OpenTopoMap"))
+
+#m    #plot mapview object only works in HTML
+
+mapshot(m, file = paste0(getwd(), "/Data/msmap.png")) #create mapshot for non-html
+
+```
+
+![MODIS data.](./Data/msmap.png)
+
+Note: `mapview` doesn't seem to like plotting `date` variables?
+```{r}
+mapview(modis["ACQ_DATE"])
+```
+
+Try loading VIIRS shapefiles
+```{r}
+viirs_a <- st_read("Data/VIIRS/fire_archive_V1_103937.shp")
+glimpse(viirs_a)
+plot(viirs_a, max.plot = 15)
+
+```
+
+```{r}
+viirs_nrt <- st_read("Data/VIIRS/fire_nrt_V1_103937.shp")
+glimpse(viirs_a)
+plot(viirs_nrt, max.plot = 15)
+
+```
+
+Given we only have the archive for MODIS and the near-real time (NRT) for VIIRS eventually makes its way into the archive, I guess we can just use the archive data for now. 
+
+Get max and min dates from `ACQ_DATE`
+```{r}
+print("modis")
+print(paste0("earliest: ", min(modis$ACQ_DATE)))
+print(paste0("latest: ", max(modis$ACQ_DATE)))
+      
+print("viirs")
+print(paste0("earliest: ", min(viirs_a$ACQ_DATE)))
+print(paste0("latest: ", max(viirs_a$ACQ_DATE)))
+  
+```
+
+VIIRS data in the archive don't stretch as late as MODIS. So do I need to merge `viirs_nrt` with `viirs_a`? Check dates for `viirs_nrt`
+```{r}
+
+print("viirs nrt")
+print(paste0("earliest: ", min(viirs_nrt$ACQ_DATE)))
+print(paste0("latest: ", max(viirs_nrt$ACQ_DATE)))
+  
+```
+
+VIIRS runs to 2010-11-29 vs 2019-11-25 for MODIS. So merge and remove dates after 2019-11-25 from VIIRS
+```{r}
+glimpse(viirs_a)
+glimpse(viirs_nrt)
+```
+
+15 variables in each so we should be able to just bind the rows
+```{r eval=F}
+viirs <- rbind(viirs_a, viirs_nrt)
+```
+
+But the above thows and error: `Error in match.names(clabs, names(xi)) : names do not match previous names`
+
+The problem is `DAYNIGHT` in archive but not nrt and `TYPE` _vice versa_. We need common variables to be able to bind rows
+```{r}
+viirs_a <- select(viirs_a, -TYPE)
+
+viirs_nrt <- select(viirs_nrt, -DAYNIGHT)
+
+all_equal(colnames(viirs_a), colnames(viirs_nrt))
+```
+
+Now try to bind rows
+```{r}
+viirs <- rbind(viirs_a, viirs_nrt)
+
+glimpse(viirs)
+```
+
+Number of records seems to match (`18295 + 181 = 18796`)
+
+## Rasterise
+
+Load the `.tif` 
+```{r}
+library(raster)
+
+ltr <- stack("Data/LTGEE20012020.tif")
+names(ltr)
+names(ltr) <- c("Year", "Magnitude", "Duration", "Pre Value", "Spec Chg", "DSNR")
+```
+
+Plot with modis for a quick view  
+```{r}
+plot(ltr[["Year"]])
+plot(modis["FRP"], add=T)
+
+```
+
+Compare the extents and crs's of our three datasets
+```{r}
+print("ltr")
+extent(ltr)
+crs(ltr)
+print("modis")
+extent(modis)
+crs(modis)
+print("viirs")
+extent(viirs)
+crs(viirs)
+```
+
+Extents looks pretty consistent and everything is unprojected so we can try rasterize-ing as-is
+```{r}
+
+modis_ras <- rasterize(modis, ltr, field="LATITUDE",fun='last')
+plot(modis_ras)
+
+viirs_ras <- rasterize(viirs, ltr, field="LATITUDE",fun='last')
+plot(viirs_ras)
+```
+
+These may look like empty rasters but we can check summaries of the `raster`s to see what data they contain
+```{r}
+summary(modis_ras)
+summary(viirs_ras)
+```
+  
+So it looks like many cells without data. Let's do some histograms quickly too as another check:
+```{r}
+hist(modis_ras)
+hist(viirs_ras)
+```
+
+Let's crop the raster to enlarge plotted pixels to see if we can see any data
+```{r}
+crp <- c(-72.1, -72, 5.2, 5.25)
+m <- crop(modis_ras, crp)
+v<- crop(viirs_ras, crp)
+plot(m)
+plot(v)
+
+```
+
+Looks like we can see a couple of data pixels. 
+
+## Questions
+
+But the above isn't really what we want as the MODIS and VIIRS data are points at the centre of much larger pixels than the 30m of LandTrendR. For [MODIS](https://earthdata.nasa.gov/earth-observation-data/near-real-time/firms/c6-mcd14dl#ed-firms-attributes):
+
+> The thermal anomalies / active fire represent the center of a 1km pixel that is flagged by the MODIS MOD14/MYD14 Fire and Thermal Anomalies algorithm (Giglio 2003) as containing one or more fires within the pixel.
+
+For [VIIRS](https://earthdata.nasa.gov/earth-observation-data/near-real-time/firms/v1-vnp14imgt) locations are:
+
+> Center of nominal 375 m fire pixel
+
+So, how to create rasters that align for the three different products? Might there be a solution in the `SCAN` (the _along scan pixel size_) and `TRACK` (the _along track pixel size_) fields? For  [MODIS](https://earthdata.nasa.gov/earth-observation-data/near-real-time/firms/c6-mcd14dl#ed-firms-attributes): 
+
+> The algorithm produces 1km fire pixels but MODIS pixels get bigger toward the edge of scan. Scan and track reflect actual pixel size.
+
+Similarly For [VIIRS](https://earthdata.nasa.gov/earth-observation-data/near-real-time/firms/v1-vnp14imgt): 
+
+> The algorithm produces approximately 375 m pixels at nadir. Scan and track reflect actual pixel size. 
+
+Using this information I could go back to the point shapefiles and create polygons for each point, buffering around the point using the values of `SCAN` and `TRACK` for each point. A challenge here is that I don't know the  direction of the track (or scan) so don't know the orientation in which the polygon should be created. [Maps] of orbit trajectories (e.g. Fig3 in the [VIIRS user guide]()https://viirsland.gsfc.nasa.gov/PDF/VIIRS_activefire_User_Guide)  suggest the swaths though be pretty consistent in direction over our study area... just need to work out the angles. 
+
+But... For MODIS is appears `SCAN` and `TRACK` have [directions specified](https://earthdata.nasa.gov/faq/firms-faq#ed-wfm-downloa):
+
+> The scan value represents the spatial-resolution in the East-West direction of the scan and the track value represents the North-South spatial resolution of the scan. 
+
+Can I also assume this for VIIRS? The [FIRMS interactive map](https://firms.modaps.eosdis.nasa.gov/map) seems to imply this might be okay... 
+
+![Screenshot from FIRMS interactive map.](./Data/FIRMS_ss.png)
+
+I assume this approach (of 'buffering points') is needed if I want to create rasters from the point files. *But do raster grids for these products already exist?* The screenshot above and the reference to VIIRS' "nominal 375m fire pixel" implies to me that there is no 'standard' grid to which all pixels could be tied. So do I need to pursue the 'buffering points' approach?  
+
+Finally, once I have derived the MODIS and VIIRS layers I will have three raster layers all at 30m resolution. We can then measure the overlap between them, e.g. how many LTR fire pixels are also indicated as fires by MODIS and VIIRS? Estimating area seems more challenging using this 3-layer method as I think we would expect LTR to producing smaller fire area given the finer resolution of data. 
+
+
+### Other 
+
+Quick check on relationship between `SCAN` and `TRACK`
+```{r}
+
+scatter.smooth(modis$SCAN,modis$TRACK)
+cor.test(modis$SCAN,modis$TRACK,method="spearman")
+
+```
 
 
