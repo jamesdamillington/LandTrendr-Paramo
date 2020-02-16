@@ -1,0 +1,312 @@
+---
+title: "LandTrendr-Paramo Explore"
+author: "James Millington"
+date: "2020-02-04"
+output: github_document
+---
+
+Email from Kris, 2020-01-30
+
+> I’ve rerun what I think should be our baseline settings with the results downloadable from https://drive.google.com/open?id=1XQvk_JI8cyTH48elFP8HB4m21VdMKZj5
+
+> Note there are 6 layers:
+>
+> 1. Year of Disturbance detection (YOD)
+2. Magnitude of disturbance
+3. Duration of disturbance
+4. Pre-disturbance value
+5. Rate of spectral change
+6. Disturbance signal-to-noise ratio (DSNR)*
+
+Try loading data (six-layer .tif file)
+
+```{r}
+library(raster)
+
+dat <- stack("Data/LTGEE20012020.tif")
+names(dat)
+
+names(dat) <- c("Year", "Magnitude", "Duration", "Pre Value", "Spec Chg", "DSNR")
+
+plot(dat)
+
+ncell(dat)
+```
+
+Looks like NoData has not been indicated (lots of zeros). Should be fine for first three layers to set NoData = 0. But also, this is a huge raster. So:
+
+- subset to first three layers
+- crop to a smaller extent for testing
+- set 0 to NA
+
+```{r}
+
+#subset
+sdat <- stack(dat[[1]], dat[[2]], dat[[3]])
+
+#cropt
+extent(sdat)
+crp <- c(-72.3, -72.25, 5.2, 5.25)
+sdat <- crop(sdat, crp)
+
+#0 to NA
+NAize <- function(x) { ifelse(x == 0, NA, x) }
+sdat <- calc(sdat, fun=NAize)
+
+plot(sdat)
+
+```
+
+There's no unique fire ID. Add one using `clump` on `Year` layer:
+
+```{r}
+
+IDs <- clump(sdat[["Year"]])
+plot(IDs)
+names(IDs) <- "FireID"
+
+sdat <-stack(sdat, IDs)
+plot(sdat)
+
+```
+
+Let's check if this worked. If so, all patches should have a SD of zero (because all values within the patch should be identical):
+
+```{r}
+
+tab.years.sd <- zonal(x=sdat[["Year"]], z=sdat[["FireID"]], fun='sd')
+tab.years.sd
+
+```
+
+Something strange about FireIDs 3 and 35. Examine those only:
+
+```{r}
+
+NAize3 <- function(x) { ifelse(x != 3, NA, x) }
+
+sdat[["Fire3"]] <- calc(sdat[["FireID"]], NAize3)
+
+freq(sdat[["Fire3"]])
+
+```
+
+This shows `FireID 3` has size one cell, hence `sd = NA`. So this is okay. Let's look at `FireID 35`:
+
+```{r}
+
+NAize35 <- function(x) { ifelse(x != 35, NA, x) }
+
+sdat[["Fire35"]] <- calc(sdat[["FireID"]], NAize35)
+
+dat35.yr <- mask(sdat[["Year"]], sdat[["Fire35"]])
+dat35.yr <- trim(dat35.yr)
+plot(dat35.yr)
+
+freq(dat35.yr)
+unique(dat35.yr)
+
+```
+
+This map shows that cells from two different years are being `clump`ed into the same Fire (FireID == 35). So this approach is not appropriate. 
+
+[This SO post](https://stackoverflow.com/a/30097452) implies we need to loop through Years (classes) creating clumps.
+
+Or could we use the `landscapemetrics` [package](https://r-spatialecology.github.io/landscapemetrics/index.html). Let's try this package first:
+
+```{r}
+
+library(landscapemetrics)
+
+p <- get_patches(sdat[["Year"]])
+
+plot(stack(p))
+
+```
+
+So `get_patches` returns a list of `raster` layers (which can then be `stack`ed)
+
+Let's check the the patch classes identified by `get_patches` matches what we see in the original data:
+
+```{r}
+
+unique(sdat[["Year"]])
+
+```
+
+So now, how can we extract the number of fires in each year? Ideally, we will be able to extract a dataframe year by patch. First, we should [check the landscape](https://r-spatialecology.github.io/landscapemetrics/articles/getstarted.html#checking-your-landscape):
+
+```{r}
+
+check_landscape(sdat[["Year"]])
+
+```
+
+`landscapemetrics` wants us to use CRS with units of m. Check the current CRS: 
+
+```{r}
+
+crs(dat)
+
+```
+
+This is in decimal degrees. Using [this webpage](https://www.latlong.net/lat-long-utm.html) it seems our study area is UTM zone 19N. So re-project to UTM using proj.4 from [EPSG:32619](https://epsg.io/32619):
+
+```{r}
+
+sr <- "+proj=utm +zone=19 +datum=WGS84 +units=m +no_defs" 
+
+sdat <- stack(sdat[["Year"]],sdat[["Magnitude"]],sdat[["Duration"]])
+sdat.utm <- projectRaster(sdat, crs = sr, method="ngb")
+plot(sdat.utm)
+
+```
+
+And then check landscape again: 
+```{r}
+check_landscape(sdat.utm)
+
+```
+
+In this landscape check we see `Year` and `Duration` are fine, but `Magnitude` should not be analysed using `landscapemetrics` (due to number of classes, i.e. this is not a categorical variable, but continuous). 
+
+Back to working out how to extract the number of fires in each year:
+
+```{r}
+library(tidyverse)
+
+#first calculate patch metric (area)
+area <- lsm_p_area(sdat.utm[[1]])
+area <- area %>% 
+  rename(Year = class, Area_ha = value)
+area 
+
+#now we can count fires in each year 
+area %>% 
+  group_by(Year) %>% 
+  tally()
+
+#and plot a bar chart
+area %>% 
+  group_by(Year) %>% 
+  tally() %>%
+  ggplot(aes(Year)) +
+    geom_bar(aes(weight=n)) +
+    xlab("Year")
+  
+#we can also plot the distribution of area by year
+ggplot(area, aes(Area_ha)) +
+  geom_density() +
+  facet_grid(Year ~.) +
+  xlab("Area (ha)")
+
+```
+
+Definding patches by Year as class, we can think about things we might want to compare between runs:
+
+- number of fires: overall use `lsp_l_np`, by year use `lsp_c_np`)
+- max and median fire size: no functions, so calculate overall (lsp) and by year (class) from `lsp_p_area`
+- total fire area: overall use `lsp_l_ta`, by year use `lsp_c_ca`
+
+We can also think about [available shape metrics](https://r-spatialecology.github.io/landscapemetrics/reference/index.html#section-patch-level-metrics) (later). 
+
+However, this approach does not allow us to calculate metrics for the continuous measures from LandTrendr. To do this we can use the `Year` layer from the original data, plus a layer with unique patch IDs created from from `get_patches()`:
+
+```{r}
+mag <- sdat.utm[["Magnitude"]]
+
+#get patches
+p <- get_patches(sdat.utm[["Year"]])
+plot(stack(p))
+```
+
+Remember `get_patches()` returns a raster for each year, restarting patch numbering each year. So we need to loop to create unique patch ids across ALL years:
+
+```{r}
+patchID <- p[[1]] #initially patchID is the first layer of the stack
+
+#loop to create unique patch ids across ALL years
+for(i in 2:length(p)){
+
+  #starting at i = 2, means val_base initially is calculated for pc
+  val_base  = cellStats(patchID,stat='max',na.rm=TRUE)
+  
+  #update pc, adding the max value of the previous layer to all cell values
+  patchID <- cover(patchID, calc(p[[i]], function(x) x + val_base))
+}
+```
+
+Now create a stack of rasters containing original data, year-patches and unique patchID 
+
+```{r}
+mag.s <- stack(mag, sdat.utm[["Year"]], patchID)
+names(mag.s[[3]]) <- "Patch"
+
+plot(mag.s)
+
+```
+
+With this we can now calculate (zonal) statistics of magnitude by year:
+```{r}
+
+#calculate summary of magnitudes by year
+zs <- zonal(mag.s[["Magnitude"]], mag.s[["Year"]], fun=sum)
+zm <- zonal(mag.s[["Magnitude"]], mag.s[["Year"]], fun=median)
+zsd <- zonal(mag.s[["Magnitude"]], mag.s[["Year"]], fun=sd)
+
+mag.yr <- left_join(as.data.frame(zs), as.data.frame(zm), by = "zone")
+mag.yr <- left_join(mag.yr, as.data.frame(zsd), by = "zone")
+names(mag.yr) <- c("Patch", "Sum", "Median", "SD")
+
+mag.yr
+
+```
+
+And by patch:
+```{r}
+
+#calculate summary of magnitudes by patch
+zs <- zonal(mag.s[["Magnitude"]], mag.s[["Patch"]], fun=sum)
+zm <- zonal(mag.s[["Magnitude"]], mag.s[["Patch"]], fun=median)
+zsd <- zonal(mag.s[["Magnitude"]], mag.s[["Patch"]], fun=sd)
+
+mag.patch <- left_join(as.data.frame(zs), as.data.frame(zm), by = "zone")
+mag.patch <- left_join(mag.patch, as.data.frame(zsd), by = "zone")
+names(mag.patch) <- c("Patch", "Sum", "Median", "SD")
+
+mag.patch
+```
+
+It might also be useful to consider the Year in which each patch burned, so attach year to individual patches:
+```{r}
+
+#create table to cover all patchIDs (with years) to join to the mag.patch table... 
+yr_ls <- unique(mag.s[["Year"]])
+ids <- unique(mag.s[["Patch"]])
+
+yr_counts <- c()
+for(i in seq_along(p)){
+   yr_counts <- c(yr_counts, cellStats(p[[i]],stat='max',na.rm=TRUE))
+}
+
+yrs <-cbind(yr_ls, yr_counts)
+yrs <- yrs[rep(seq_len(nrow(yrs)),yrs[,2]),1:2] #expand the table
+yrs <- as.data.frame(cbind(yrs, ids))
+
+##now join to the original table 
+mag.patch <- left_join(mag.patch, yrs, by = c("Patch" = "ids"))
+mag.patch <- mag.patch %>%
+  select(-yr_counts) %>%
+  rename(Year = yr_ls)
+
+mag.patch
+
+```
+
+So now for these continuous variables we could examine the following between runs (using magnitude as an example):
+
+- total (all years) and annual magnitude between runs
+- max/median magnitude (total and per year) between runs
+- distribution (e.g. SD) of patch magnitude for a given year (or all years) 
+
+
