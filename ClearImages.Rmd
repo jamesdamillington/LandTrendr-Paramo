@@ -21,7 +21,7 @@ Ultimately we can compare three window lengths:
 Identifying the length of window 3. demands examining the number of cloud free pixels in windows of varying length. _Question: do these windows always need to start from Jan or could they start later in the year?_
 
 ## Data 
-
+  
 There data are for 2010-2019 with the following file-naming convention:
 - ClearMon0 is 2010
 - ClearMon5 is 2015
