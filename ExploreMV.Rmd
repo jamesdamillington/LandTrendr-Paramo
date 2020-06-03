@@ -3,12 +3,10 @@ title: "ExploreMV"
 author: "James Millington"
 date: "16/02/2020"
 output:
-#  pdf_document:
-#    toc: yes
-#  html_document:
-#    toc: yes
-#  always_allow_html: true
-  github_document
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
 ---
 
 
@@ -45,13 +43,11 @@ library(mapview)
 
 m <- mapview(modis, zcol=c("FRP","SATELLITE","BRIGHT_T31"), lwd = 0, alpha.regions = 1, cex = 5, map.types=c("Esri.WorldImagery","OpenTopoMap"))
 
-#m    #plot mapview object only works in HTML
+m    #plot mapview object only works in HTML
 
-mapshot(m, file = paste0(getwd(), "/Data/msmap.png")) #create mapshot for non-html
-
+#mapshot(m, file = paste0(getwd(), "/Data/msmap.png")) #create mapshot for non-html
+#![MODIS data.](./Data/msmap.png)   #copy this to text if non-html
 ```
-
-![MODIS data.](./Data/msmap.png)
 
 Note: `mapview` doesn't seem to like plotting `date` variables?
 ```{r}
@@ -107,9 +103,9 @@ glimpse(viirs_nrt)
 viirs <- rbind(viirs_a, viirs_nrt)
 ```
 
-But the above thows and error: `Error in match.names(clabs, names(xi)) : names do not match previous names`
+But the above throws an error: `Error in match.names(clabs, names(xi)) : names do not match previous names`
 
-The problem is `DAYNIGHT` in archive but not nrt and `TYPE` _vice versa_. We need common variables to be able to bind rows
+The problem is `DAYNIGHT` is in archive but not in nrt and `TYPE` _vice versa_. We need common variables to be able to bind rows
 ```{r}
 viirs_a <- select(viirs_a, -TYPE)
 
