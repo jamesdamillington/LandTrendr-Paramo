@@ -1,0 +1,357 @@
+---
+title: "Compare LTR-VIIRS"
+author: "James Millington"
+date: "15/04/2020"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+pacman::p_load(tidyverse, raster, tabularaster, sf, mapview, viridis)   #assumes pacman loads at startup (e.g. from .Rprofile)
+```
+
+# Comparing Paramo fire between LTR and VIIRS
+
+Taking a binning approach (rather than a 'full geometry' approach - see discussion with Mark de Jong, 2020-02-19) to compare presence/absence of fires detected using LTR vs VIIRS requires the following steps:
+
+1. Create a grid by resampling the landsat LTR data to a coarser resolution (1 sq km, see [Brazil MapBiomas code](https://github.com/jamesdamillington/BrazilInputMaps) for help)  
+2. bin (count) MODIS/VIIRS fires into this using [raster::rasterize](https://www.rdocumentation.org/packages/raster/versions/3.0-12/topics/rasterize)
+3. overlay bin maps with LTR and count correspondence (read for metrics to do this) 
+
+Code here learns from ExploreLTR and ExploreMV.
+
+## Resample LTR 
+
+### First load data 
+
+```{r}
+#raster
+dat <- raster::stack("Data/LTR_fire2020_274.tif")
+names(dat) <- c("Year", "Magnitude", "Duration", "Pre Value", "Spec Chg", "DSNR")
+plot(dat$Year)
+
+```
+
+Get extent, resolution and CRS of data:
+```{r}
+#we'll write a function as we'll likely want this info for other rasters
+summariseRas <- function(ras)
+{
+  print(extent(ras))
+  print(paste("xres: ",xres(ras), sep=""))
+  print(paste("yres: ",yres(ras), sep=""))
+  print(paste("CRS: ",crs(ras), sep=""))
+  print(paste("nrows: ",nrow(ras), sep=""))
+  print(paste("ncol: ",ncol(ras), sep=""))
+  print(paste("ncells: ",ncell(ras), sep=""))
+}
+
+summariseRas(dat)
+```
+
+Let's add some shapefile data to get a feel for the location of the raster:
+```{r}
+
+buf <- st_read("/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m.shp")
+
+#set crs of shp to same as for raster
+buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
+
+plot(dat$Year)
+plot(st_geometry(buf), add=T)
+
+```
+
+
+### Aggregate to 'resample'
+
+Let's try the `raster::aggregate` function to create a coarse grid based on the fine LTR grid. Using `fcat=33` would mean 33 x 30m = 990m resolution pixels, which is about what we want. But note from the details of `aggregate` that we may lose pixels from the original (using `expand=FALSE`):
+
+> Aggregation starts at the upper-left end of a raster (you can use flip if you want to start elsewhere). If a division of the number of columns or rows with factor does not return an integer, the extent of the resulting Raster object will either be somewhat smaller or somewhat larger then the original RasterLayer. For example, if an input RasterLayer has 100 columns, and fact=12, the output Raster object will have either 8 columns (expand=FALSE) (using 8 x 12 = 96 of the original columns) or 9 columns (expand=TRUE). In both cases, the maximum x coordinate of the output RasterLayer would, of course, also be adjusted.
+
+7871 / 33 = 238.5 columns and 6920 / 33 = 209.7 rows (so with `exapnd=FALSE` we lose 17 columns and 23 rows of pixels). The study area doesn't cover the entire LTR scene this should work...  
+
+Let's try it and then check what we get:
+```{r}
+dat33 <- aggregate(dat, fact=33, fun=max, expand=F)
+```
+
+Plot:
+```{r}
+plot(dat33$Year)
+```
+
+Looks good. Now summarise:
+```{r}
+summariseRas(dat33)
+
+```
+
+`nrows` and `ncols` is as we were expecting, but we should check the how many fires when reducing the extent of the grid. 
+
+## Bin VIIRS fires
+
+### Load VIIRS data
+
+```{r}
+
+viirs_a <- st_read("Data/VIIRS/fire_archive_V1_103937.shp")
+glimpse(viirs_a)
+plot(viirs_a, max.plot = 15)
+```
+
+Set crs of shp to same as for raster and check:
+```{r}
+
+viirs_at <- st_transform(viirs_a, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
+glimpse(viirs_at)
+plot(viirs_at, max.plot = 15)
+```
+
+Looks okay. 
+
+### Rasterize to bin
+
+VIIRS data are vector so now we can use `raster::rasterize` to bin them on our coarse (990m) grid. Using `fun=count` should give the number of fires observed in each of the coarse grain cells. We'll use `INSTRUMENT` field for now as is simple.
+```{r}
+viirs_r <- rasterize(x=viirs_at, y=dat33,field="LATITUDE",fun='count', expand=F)
+
+```
+
+Check this worked:
+```{r}
+summariseRas(viirs_r)
+
+plot(viirs_r)
+```
+
+### Initial Analysis
+
+How many fires do we lose because of the smaller extent of the coarse grid?
+
+```{r}
+vrdat <- tabularaster::as_tibble(viirs_r)
+
+vrassum <- sum(vrdat$cellvalue, na.rm=T)
+
+vvecsum <- length(viirs_at$LATITUDE)
+
+paste0("Fires in raster: ",vrassum)
+paste0("Fires in vector: ",vvecsum)
+paste0("Diffc is: ",vvecsum - vrassum)
+
+```
+
+So 29 fires are missing. I assume these are at the bottom and right edge of the study area, but let's check. 
+
+```{r}
+
+#first interesct the viirs points with the coarse raster, with help from https://gis.stackexchange.com/a/230914
+crop_viirs_at <- st_intersection(viirs_at, st_set_crs(st_as_sf(as(raster::extent(viirs_r), "SpatialPolygons")),st_crs(viirs_at)))  
+#now get the missing fires using dplyr::setdiff between the two data frames (one with all fires, one with only those within coarse raster extent
+#set geometry null to avoid error in dplyr::setdiff  e.g. see https://community.rstudio.com/t/performing-a-full-join-on-sf-objects/43902/5
+viirs_at_ng <- viirs_at %>% st_drop_geometry()   
+crop_viirs_at_ng <- crop_viirs_at %>% st_drop_geometry() 
+dropped_fires <- setdiff(viirs_at_ng, crop_viirs_at_ng)  
+
+#output
+paste0("Count of dropped fires: ",length(dropped_fires[,1]))
+```
+
+Here indeed are our missing 29 fires. Plotting these shows they are at bottom and right of the grid:
+```{r}
+
+dropped_sf <- st_as_sf(dropped_fires, coords=c("LONGITUDE","LATITUDE"), crs = "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
+
+plot(st_geometry(dropped_sf))
+```
+
+Look about right. Try to show dropped fires on the map (but currently this does not work). 
+```{r}
+
+plot(dat$Year)
+plot(dropped_sf["SATELLITE"], pal=viridis(10), add=T)
+plot(st_geometry(dropped_sf), add=T)
+
+```
+
+Now let's look at a histogram of the values in the new coarse VIIRS raster:
+```{r}
+#get the data from the raster into a tibble
+vrdat <- tabularaster::as_tibble(viirs_r)
+
+min(vrdat, na.rm=T)
+ggplot(subset(vrdat,!is.na(cellvalue)), aes(x = cellvalue)) + 
+  geom_histogram() + scale_y_log10()
+
+#ggplot(vrdat_zeros, aes(x = cellvalue)) + 
+#  geom_histogram(breaks= c(0,1,50,seq(100,max(vrdat_zeros$cellvalue),50))) + scale_y_log10() 
+```
+
+What is the proportion of cells with more than 1 'fire'?
+```{r}
+gtr1 <- subset(vrdat,cellvalue > 1)
+
+#create data with ND set to zero (to get prop of entire grid)
+vrdat_zeros <- vrdat %>%
+  mutate(cellvalue = ifelse(is.na(cellvalue), 0, cellvalue))
+
+#prop total grid
+paste("prop of total grid: ",signif(length(gtr1) / ncell(vrdat),4))
+
+#prop data
+paste("prop of data cells: ",signif(length(gtr1$cellvalue) / length(vrdat_zeros$cellvalue),4))
+
+```
+
+What is the proportion of cells with more than 10 'fires'?
+```{r}
+gtr10 <- subset(vrdat_zeros,cellvalue > 10)
+
+paste("prop of total grid: ",signif(length(gtr10) / ncell(vrdat),4))
+
+paste("prop of data cells: ",signif(length(gtr10$cellvalue) / length(vrdat_zeros$cellvalue),4))
+
+```
+
+What is the max?
+```{r}
+max(vrdat_zeros$cellvalue)
+```
+
+Why so high? Looking at data the max point seems to be located around 5.8, -72.8 so let's zoom to that region:
+```{r}
+
+plot(viirs_r, ext=c(720000,740000,630000,650000), col=viridis(10))
+plot(st_geometry(buf), add=T)
+#plot(viirs_at["LATITUDE"], add=T)
+
+```
+
+We can use mapview to create an interactive map:
+```{r}
+
+mapview(st_geometry(buf), color="red", alpha.regions = 0, map.types=c("Esri.WorldImagery","OpenTopoMap")) + 
+  mapview(viirs_at, zcol="INSTRUMENT", lwd = 0, alpha.regions = 1, cex = 5, map.types=c("Esri.WorldImagery","OpenTopoMap")) +
+  mapview(viirs_r, method="ngb", map.types=c("OpenTopoMap"))   
+
+```
+
+Note there is some mis-alignment of raster due to projection (mapview uses [Web Mercator, EPSG:3857](https://rstudio.github.io/leaflet/raster.html)), but the underlying data (as shown in analysis above) seems correct.
+
+From Kris' [Google MyMaps of the paramo](https://www.google.com/maps/d/embed?mid=1UQymMdJPVfL_nL4343RU3obGVbEoyvYO), this looks to be around the town of Belencito. Using OpenTopo basemap with the `viirs_r` raster not visible in the interactive map above, we can see many 'fires' from buildings in Belencito. We should discount these records. 
+
+But these 'fires' are outside the Paramo buffer region, so maybe not an issue anyway. 
+
+So let's mask the viirs raster to the Paramo buffer shapefile
+```{r}
+
+buf_r <- rasterize(buf, dat33, field=1)
+
+viirs_rp <- mask(viirs_r, buf)
+plot(viirs_rp)
+plot(st_geometry(buf), add=T)
+
+```
+
+Analysis on this masked data shows: 
+```{r}
+vrdat_p <- tabularaster::as_tibble(viirs_rp)
+
+paste0("Max Paramo pixel: ",max(vrdat_p$cellvalue, na.rm=T))
+paste0("Sum Paramo Raster fires: ",sum(vrdat_p$cellvalue, na.rm=T))
+
+ggplot(subset(vrdat_p,!is.na(cellvalue)), aes(x = cellvalue)) + 
+  geom_histogram() 
+
+```
+
+So far fewer fires (549) and a max of 18 in a single pixel. This seems more feasible. First, intersect viirs vector data with the Paramo shapefile:
+```{r}
+viirs_p <- st_intersection(viirs_at, buf)
+
+```
+
+Check number of fires from the viirs vector data to check we have the same number in raster:
+```{r}
+
+paste0("Sum Paramo Vector fires: ",length(viirs_p$LATITUDE))
+
+```
+
+561 in vector vs 549 in raster. Where are we losing 12 fires? If we plot to see how the raster version of the Paramo boundary aligns with the vector version we see why we are losing some fires:  
+
+```{r}
+
+plot(buf_r, ext=c(725000,730000,637000,645000), col=viridis(10))
+plot(st_geometry(viirs_p), add=T)
+plot(st_geometry(buf), add=T)
+
+```
+
+So let's create a raster of the Paramo polygon using the finer scale (30m res) then aggregate that to see if it helps capture more fires:
+
+```{r}
+buf_r30 <- rasterize(buf, dat, field=1)
+
+buf_r990 <- aggregate(buf_r30, fact=33, fun=max, expand=F)
+
+```
+
+Looks like it. And let's compare the number of pixels in each raster:
+```{r}
+
+paste0("Original raster: ",cellStats(buf_r, sum))
+
+paste0("New raster: ",cellStats(buf_r990, sum))
+
+```
+
+Many more pixels. So let's see what that does to the number of VIIRS (vector) files that are now captured in the raster:
+```{r}
+viirs_rp990 <- mask(viirs_r, buf_r990)
+
+plot(viirs_rp990, ext=c(725000,730000,637000,645000), col=viridis(10))
+plot(st_geometry(buf), add=T)
+plot(st_geometry(viirs_p), add=T)
+
+
+vrdat_p990 <- tabularaster::as_tibble(viirs_rp990)
+
+paste0("Max Paramo pixel: ",max(vrdat_p990$cellvalue, na.rm=T))
+paste0("Sum Paramo Raster fires: ",sum(vrdat_p990$cellvalue, na.rm=T))
+
+ggplot(subset(vrdat_p990,!is.na(cellvalue)), aes(x = cellvalue)) + 
+  geom_histogram() 
+
+```
+
+So now we have _gained_ fires, with the raster showing 631 fires vs the vector showing 561 (because now more pixels are being classed as being within the paramo). **Which way to we want to err here - more or fewer fires?** I think probably the method that captures _more_ fires?
+
+For full comparison (but bearing in mind there is some mis-alignment of raster), look at the interactive map:
+```{r}
+
+mapview(st_geometry(buf), color="red", alpha.regions = 0, map.types=c("Esri.WorldImagery","OpenTopoMap")) + 
+  mapview(viirs_p, zcol="INSTRUMENT", lwd = 0, alpha.regions = 1, col.regions="red",cex = 5, map.types=c("Esri.WorldImagery","OpenTopoMap")) +
+  mapview(viirs_at, zcol="INSTRUMENT", lwd = 0, alpha.regions = 1, cex = 5, map.types=c("Esri.WorldImagery","OpenTopoMap")) +
+  mapview(viirs_rp990, method="ngb", map.types=c("OpenTopoMap")) + 
+  mapview(viirs_rp, method="ngb", map.types=c("OpenTopoMap")) 
+
+```
+
+Either way, we can see that the max pixels seems to be in the central area @KRIS mentioned in our MS Teams call on 2020-04-17. From the `Esri.WorldImagery` layer there does not appear to be any buildings in this area so can we assume these are actual fires?
+
+This all looks okay now (note that it looks from the interactive map that there is an issue that the raster does not reach the limits of the Paramo shapefile, but this is just how leaflet renders the raster)
+
+
+## Next Steps
+
+1. Check more carefully if there are any VIIRS 'fires' that we shouldn't be using for comparison (as they are unlikely to be actual fires)? 
+2. Create raster layers by year (for both LTR and VIIRS) for comparison. **Q on this: should I actually be more specific for VIIRS and use dates for the two seasons that @KRIS is using with LTR?**
+3. Work out how to compare presence/absence of fires between LTR and VIIRS rasters (by time period, for a given LTR parameterisation)
+
