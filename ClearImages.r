@@ -19,8 +19,8 @@ imageFilename <- function(yr,mon){
 }
 
 #INPUTS
-Years <- seq(2010,2010,1)   #list of Years to analyse
-StartMonth <- seq(10,11,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
+Years <- seq(2010,2019,1)   #list of Years to analyse
+StartMonth <- seq(1,12,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
 path <- "Data/ClearImages/" #path to data directory
 
 #structure for output data
