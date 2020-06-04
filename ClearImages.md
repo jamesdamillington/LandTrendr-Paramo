@@ -1,36 +1,53 @@
----
-title: "LandTrendr-Paramo Clear Image Analysis"
-author: "James Millington"
-date: "2020-06-02"
-output: github_document
----
- 
+LandTrendr-Paramo Clear Image Analysis
+================
+James Millington
+2020-06-02
+
 # Clear Images Analysis
 
 ## Rationale
-Our Paramo study region is characterised by high cloud cover. LandTrendR requires that we specify a window of time during a year to analyse images for change detection. Previous papers have recommended the window should correspond with the growing season. However, our study area is in the tropics with no clearly defined growing season. Furthermore, with high levels of cloud cover we may not be able to limit ourselves to the most physically-appropriate window from the perspective ofchange detection.   
 
-Here we examine how long the window needs to be to maximise the number of cloud-free pixels. We want a window as short as possible to detect change, but longer window will allow greater probability of cloud-free pixels. 
+Our Paramo study region is characterised by high cloud cover. LandTrendR
+requires that we specify a window of time during a year to analyse
+images for change detection. Previous papers have recommended the window
+should correspond with the growing season. However, our study area is in
+the tropics with no clearly defined growing season. Furthermore, with
+high levels of cloud cover we may not be able to limit ourselves to the
+most physically-appropriate window from the perspective ofchange
+detection.
+
+Here we examine how long the window needs to be to maximise the number
+of cloud-free pixels. We want a window as short as possible to detect
+change, but longer window will allow greater probability of cloud-free
+pixels.
 
 Ultimately we can compare three window lengths:
 
-1. current best based on physical properties (Jan-Apr, because anecdotally this is the anthro fire season)
-2. entire year-long window
-3. trade-off window between the 1. and 2. (most pixels for shortest window)
+1.  current best based on physical properties (Jan-Apr, because
+    anecdotally this is the anthro fire season)
+2.  entire year-long window
+3.  trade-off window between the 1. and 2. (most pixels for shortest
+    window)
 
-Identifying the length of window 3. demands examining the number of cloud free pixels in windows of varying length. _Question: do these windows always need to start from Jan or could they start later in the year?_
+Identifying the length of window 3. demands examining the number of
+cloud free pixels in windows of varying length. *Question: do these
+windows always need to start from Jan or could they start later in the
+year?*
 
-## Data 
-  
+## Data
+
 There data are for 2010-2019 with the following file-naming convention:
-- ClearMon0 is 2010
-- ClearMon5 is 2015
+- ClearMon0 is 2010 - ClearMon5 is 2015
 
+### Visualise Examples of the Data
 
-### Visualise Examples of the Data 
-```{r}
+``` r
 library(raster)
+```
 
+    ## Loading required package: sp
+
+``` r
 dat1 <- raster("Data/ClearImages/ClearJan0.tif")
 dat2 <- raster("Data/ClearImages/ClearFeb0.tif")
 
@@ -38,19 +55,34 @@ st <- stack(dat1,dat2)
 sd <- sum(st)
 
 plot(dat1, main="Image1")
-plot(dat2, main = "Image2")
-plot(sd, main="Sum")
-
 ```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
+
+``` r
+plot(dat2, main = "Image2")
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-1-2.png)<!-- -->
+
+``` r
+plot(sd, main="Sum")
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-1-3.png)<!-- -->
 
 ### Create Data Summary
 
-The following script generates summary counts of cloud-free pixels for Paramo, examining different windows of time. Summary is by Year, StartMonth and WindowLength and output is counts of pixels with 0,1,2,3,4,5,6+ cloud free images in a given window. The output data file (csv) is window-per-line. See further comments in the code. 
+The following script generates summary counts of cloud-free pixels for
+Paramo, examining different windows of time. Summary is by Year,
+StartMonth and WindowLength and output is counts of pixels with
+0,1,2,3,4,5,6+ cloud free images in a given window. The output data file
+(csv) is window-per-line. See further comments in the code.
 
-As this script takes a while to run, it is presented here for completeness, but best run using ClearImages.r independently. 
+As this script takes a while to run, it is presented here for
+completeness, but best run using ClearImages.r independently.
 
-```{r eval=F}
-
+``` r
 library(raster)
 library(tidyverse)
 
@@ -149,22 +181,48 @@ for(i in Years){
 
 write_csv(x=clearData,
           path=paste0(path,"ClearImagesSummary_",head(Years,1),"-",tail(Years,1),"_",month.abb[head(StartMonth,1)],"-",month.abb[tail(StartMonth,1)],".csv"))
-
 ```
 
-```{r}
-
+``` r
 library(tidyverse)
+```
+
+    ## ── Attaching packages ──────────────────────────────────────────────────────────────────────────────────── tidyverse 1.3.0 ──
+
+    ## ✓ ggplot2 3.3.1     ✓ purrr   0.3.4
+    ## ✓ tibble  3.0.1     ✓ dplyr   1.0.0
+    ## ✓ tidyr   1.1.0     ✓ stringr 1.4.0
+    ## ✓ readr   1.3.1     ✓ forcats 0.5.0
+
+    ## ── Conflicts ─────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+    ## x tidyr::extract() masks raster::extract()
+    ## x dplyr::filter()  masks stats::filter()
+    ## x dplyr::lag()     masks stats::lag()
+    ## x dplyr::select()  masks raster::select()
+
+``` r
 path <- "Data/ClearImages/" #path to data directory
 dat <- read_csv(paste0(path,"ClearImagesSummary_2010-2011_Jan-Dec.csv"))
-
 ```
+
+    ## Parsed with column specification:
+    ## cols(
+    ##   Year = col_double(),
+    ##   WindowStart = col_double(),
+    ##   WindowLen = col_double(),
+    ##   Count0 = col_double(),
+    ##   Count1 = col_double(),
+    ##   Count2 = col_double(),
+    ##   Count3 = col_double(),
+    ##   Count4 = col_double(),
+    ##   Count5 = col_double(),
+    ##   Count6p = col_double(),
+    ##   Max = col_double()
+    ## )
 
 ### Initial Summary Visualization
 
-
-```{r}
-
+``` r
 #plot count0 against window length (group by year, windows starting from Jan)
 
 dat %>%
@@ -177,7 +235,9 @@ dat %>%
   ggtitle("All Windows Start in Jan")
 ```
 
-```{r}
+![](ClearImages_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+
+``` r
 dat %>%
   filter(WindowStart == 1 & Year < 2012) %>%
   mutate(across(matches("Year"),as.factor)) %>%
@@ -189,10 +249,14 @@ dat %>%
   ggtitle("All Windows Start in Jan")
 ```
 
-In next plot, `Count0` is count of pixels that are not cloud free in the window, `Count1` is count of pixels that have one cloud free image in the window... etc. to `Count6p` which is count of pixels with 6 or more cloud free images in the window. 
+![](ClearImages_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
-```{r}
+In next plot, `Count0` is count of pixels that are not cloud free in the
+window, `Count1` is count of pixels that have one cloud free image in
+the window… etc. to `Count6p` which is count of pixels with 6 or more
+cloud free images in the window.
 
+``` r
 total_cells <- ncell(dat2)
 
 countprop <- function(num) { num/total_cells } #function to calc prop count of total image size, e.g. https://stackoverflow.com/a/49759987
@@ -209,13 +273,11 @@ dat %>%
   facet_grid(.~Year) +
   scale_y_continuous(name="Image Proportion") +
   ggtitle("All Windows Start in Jan")
-
-  
 ```
 
+![](ClearImages_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
-```{r}
-
+``` r
 #plot count0 (point size) by window length (y) and StartMonth (x)  (shape  by year)
 
 dat %>%
@@ -229,5 +291,20 @@ dat %>%
   scale_y_discrete(labels=month.abb) +
   facet_grid(.~Year) + 
   ggtitle("Non-Cloud Free")
-
 ```
+
+    ## Warning: `funs()` is deprecated as of dplyr 0.8.0.
+    ## Please use a list of either functions or lambdas: 
+    ## 
+    ##   # Simple named list: 
+    ##   list(mean = mean, median = median)
+    ## 
+    ##   # Auto named with `tibble::lst()`: 
+    ##   tibble::lst(mean, median)
+    ## 
+    ##   # Using lambdas
+    ##   list(~ mean(., trim = .2), ~ median(., na.rm = TRUE))
+    ## This warning is displayed once every 8 hours.
+    ## Call `lifecycle::last_warnings()` to see where this warning was generated.
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
