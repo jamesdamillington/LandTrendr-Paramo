@@ -1,12 +1,14 @@
   
 #Script to generate summary counts of cloud-free pixels for Paramo, examining different windows of time
 #Analysis is by Year, StartMonth and WindowLength
-#Output is counts of pixels with 0,1,2,3,4,5,6+ cloud free images in a given window
-#Output data file (csv) is window-per-line
+#Output is counts of pixels with 0,1,2,3,4,5,6+ cloud free images in a given window, for entire images and masked to study area
+#Output summary data files (csv) is window-per-line (one for entire image, one for masked study area only)
+#Output also png images for all window start-length combos, and output .tif files only for windows starting in January
   
 library(raster)
 library(tidyverse)
-
+library(RColorBrewer)
+library(sf)
 
 #####
 #FUNCTIONS
@@ -22,6 +24,7 @@ imageFilename <- function(yr,mon){
   
 }
 
+#function to add data for this window to the summary data tibble 
 appendClearData <- function(cDt, yr, ws, wl, counts, lf){
   
   #set count variables from the frequency table
@@ -48,16 +51,31 @@ appendClearData <- function(cDt, yr, ws, wl, counts, lf){
     Count6p = sixplus),
     Max = lf-1)
   
+  #return tibble (overwrite)
   return(cDt)
 }
+
+#function to write raster to png
+rasPNG <- function(ras, yr, mons) {
+  
+  png(filename=paste0(path,"ClearImagesTotals_",yr,"_",month.abb[head(mons,1)],"-",month.abb[tail(mons,1)],".png"))
+  
+  #first plot without legend
+  plot(ras, breaks=mycuts, col=mypal(length(mycuts)), legend=FALSE, main=paste0(yr," ",month.abb[head(mons,1)],"-",month.abb[tail(mons,1)]))
+  legend("right", legend=as.character(mycuts),fill=mypal(length(mycuts)))   #add custom legend
+  plot(st_geometry(buf), border="red",add=T) #add paramo buffer area
+  
+  dev.off()
+}
+
 
 #####
 #INPUTS
 Years <- seq(2010,2010,1)   #list of Years to analyse
-StartMonth <- seq(11,12,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
+StartMonth <- seq(1,3,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
 path <- "Data/ClearImages/" #path to data directory
 
-#structure for output data
+#structure for output summary data
 clearData_image <- tibble(
   Year = numeric(),         #year this window is in
   WindowStart = numeric(),  #month in which the window starts
@@ -74,13 +92,21 @@ clearData_image <- tibble(
 
 clearData_mask <- clearData_image
 
-#read mask raster
-buf <- raster("/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif")
+#read mask data 
+buf <- st_read("/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m.shp")
+buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
+buf_r <- raster("/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif")
+
+#plotting parms
+mycuts <- c(0,1,2,3,4,5,6,100)
+mypal <- colorRampPalette(c("white","black"))
+
+
 
 #####
 #ANALYSIS
 for(i in Years){
-  print(paste0("Year: ",i))  #loop in years of analysis
+  print(paste0("Year: ",i))  #loop on years of analysis
   
   for(j in StartMonth){
     print(paste0("Start Mon: ",month.abb[j]))  #loop on StartMonth of analysis
@@ -88,7 +114,7 @@ for(i in Years){
     max_wl = 13 - j   #max window length possible for this StartMonth (12 for Jan, 11 for Feb, ... 1 for Dec)
     Lengths <- seq(from=1,to=max_wl,by=1)   #create a list of possible window lengths for next loop
     
-    for(k in Lengths){
+    for(k in Lengths){  #loop on possible Window Lengths for this StartMonth
       print(paste0("Window Length: ",k))
       
       Months <- seq(from=j,length.out=k)  #create list of months for this StartMonth-WindowLength (j-k) combo 
@@ -100,7 +126,7 @@ for(i in Years){
         ras <- raster(paste0(path,imageFilename(yr=i,mon=l)))  #read raster
         images <- stack(images, ras)  #add to stack
         
-        images_mask <- mask(images,buf)
+        images_mask <- mask(images,buf) #apply mask to the stack
       }
       
       freqs <- 0  #create dummy object for frequencies from images
@@ -112,14 +138,26 @@ for(i in Years){
         
         totals_mask <- sum(images_mask)    #if more than one image in the window, calc sum of all images in the stack
         freqs_mask <- freq(totals_mask)    #then calc freq on the sum 
-      } else {
-        freqs <- freq(images,merge=T)             #if only one image in the stack, calc freq on this using merge=T
-        freqs_mask <- freq(images_mask,merge=T)   #if only one image in the stack, calc freq on this using merge=T
-      }
+        
+        #if StartMonth is Jan, output .tif of cell sums (write full image only, can mask this later if needed in subsequent analysis)
+        if(j==1) writeRaster(totals, filename=paste0(path,"ClearImagesTotals_",i,"_",month.abb[head(Months,1)],"-",month.abb[tail(Months,1)],".tif"),datatype="INT2S")
+        rasPNG(ras=totals,yr=i, mons=Months)    #always write png 
+        
       
+      } else {
+        freqs <- freq(images,merge=T)             #else, only one image in the stack, calc freq on this using merge=T
+        freqs_mask <- freq(images_mask,merge=T)   #else, only one image in the stack, calc freq on this using merge=T
+        
+        #if StartMonth is Jan, output raster of cell sums (write full image only, can mask this later if needed in subsequent analysis)
+        if(j==1) writeRaster(images, filename=paste0(path,"ClearImagesTotals_",i,"_",month.abb[head(Months,1)],"-",month.abb[tail(Months,1)],".tif"),datatype="INT2S")
+        rasPNG(ras=images,yr=i, mons=Months)      #always write png 
+        
+      }
+
       lenfreq <- length(freqs[,1])  #returns max count + 1
       lenfreq_mask <- length(freqs_mask[,1])  #returns max count + 1
       
+      #add data for this window start-length combo to the summary data table
       clearData_image <- appendClearData(cDt=clearData_image,yr=i, ws=j, wl=k, counts=freqs,lf=lenfreq)
       clearData_mask <- appendClearData(cDt=clearData_mask,yr=i, ws=j, wl=k, counts=freqs_mask,lf=lenfreq_mask)
 
@@ -127,5 +165,6 @@ for(i in Years){
   }  #end StartMonth loop
 }  #end Years loop
 
+#output summary data table
 write_csv(x=clearData,
           path=paste0(path,"ClearImagesSummary_",head(Years,1),"-",tail(Years,1),"_",month.abb[head(StartMonth,1)],"-",month.abb[tail(StartMonth,1)],".csv"))
