@@ -129,7 +129,7 @@ for(i in Years){
         ras <- raster(paste0(path,imageFilename(yr=i,mon=l)))  #read raster
         images <- stack(images, ras)  #add to stack
         
-        images_mask <- mask(images,buf) #apply mask to the stack
+        images_mask <- mask(images,buf_r) #apply mask to the stack
       }
       
       freqs <- 0  #create dummy object for frequencies from images
@@ -168,6 +168,10 @@ for(i in Years){
   }  #end StartMonth loop
 }  #end Years loop
 
-#output summary data table
-write_csv(x=clearData,
-          path=paste0(path,"ClearImagesSummary_",head(Years,1),"-",tail(Years,1),"_",month.abb[head(StartMonth,1)],"-",month.abb[tail(StartMonth,1)],".csv"))
+#output summary data tables
+write_csv(x=clearData_image,
+          path=paste0(path,"ClearImages_ImageSummary_",head(Years,1),"-",tail(Years,1),"_",month.abb[head(StartMonth,1)],"-",month.abb[tail(StartMonth,1)],".csv"))
+
+write_csv(x=clearData_mask,
+          path=paste0(path,"ClearImages_MaskSummary_",head(Years,1),"-",tail(Years,1),"_",month.abb[head(StartMonth,1)],"-",month.abb[tail(StartMonth,1)],".csv"))
+
