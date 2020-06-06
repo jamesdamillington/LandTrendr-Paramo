@@ -42,6 +42,46 @@ plot(dat2, main = "Image2")
 plot(sd, main="Sum")
 
 ```
+### Check masking
+
+First, read shp and check it aligns with raster
+```{r}
+library(sf)
+
+buf <- st_read("/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m.shp")
+
+#set crs of shp to same as for raster
+buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
+
+#check 
+plot(sd)
+plot(st_geometry(buf), add=T)
+```
+
+Now rasterise the buffer shp and use this as a mask
+```{r} 
+
+buf_r <- rasterize(buf, sd, field=1)
+sd_b <- mask(sd, buf)
+
+plot(buf_r)
+plot(sd_b)
+```
+
+We can check the number of cells in the masked raster (compared to the original image0
+```{r}
+
+print(paste0("Cells in mask: ", cellStats(buf_r, sum)))
+
+print(paste0("Cells in original: ", ncell(buf_r)))
+```
+
+Save the raster to file for use elsewhere:
+```{r}
+writeRaster(buf_r, "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif")
+
+```
+
 
 ### Create Data Summary
 
