@@ -7,6 +7,10 @@
 library(raster)
 library(tidyverse)
 
+
+#####
+#FUNCTIONS
+
 #function to create image filename from year and month values
 imageFilename <- function(yr,mon){
   
@@ -18,13 +22,43 @@ imageFilename <- function(yr,mon){
   
 }
 
+appendClearData <- function(cDt, yr, ws, wl, counts, lf){
+  
+  #set count variables from the frequency table
+  zeros <- ones <- twos <- threes <- fours <- fives <- sixplus <- 0
+  zeros <- counts[1,2]
+  if(lf > 1) ones <- counts[2,2]
+  if(lf > 2) twos <- counts[3,2]
+  if(lf > 3) threes <- counts[4,2]
+  if(lf > 4) fours <- counts[5,2]
+  if(lf > 5) fives <- counts[6,2]
+  if(lf > 6) sixplus <- sum(counts[7:lf,2])
+  
+  #append data to tibble
+  cDt <- cDt %>% add_row(tibble_row(
+    Year = yr,
+    WindowStart = ws,
+    WindowLen  = wl, 
+    Count0 = zeros,
+    Count1 = ones,
+    Count2 = twos,
+    Count3 = threes,
+    Count4 = fours,
+    Count5 = fives,
+    Count6p = sixplus),
+    Max = lf-1)
+  
+  return(cDt)
+}
+
+#####
 #INPUTS
-Years <- seq(2010,2019,1)   #list of Years to analyse
-StartMonth <- seq(1,12,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
+Years <- seq(2010,2010,1)   #list of Years to analyse
+StartMonth <- seq(11,12,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
 path <- "Data/ClearImages/" #path to data directory
 
 #structure for output data
-clearData <- tibble(
+clearData_image <- tibble(
   Year = numeric(),         #year this window is in
   WindowStart = numeric(),  #month in which the window starts
   WindowLen = numeric(),    #number of months in this window
@@ -38,7 +72,13 @@ clearData <- tibble(
   Max = numeric()           #max number of cloud free images in this window (should be equivalent to total number of images in the window)
 )
 
-#start analysis loop
+clearData_mask <- clearData_image
+
+#read mask raster
+buf <- raster("/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif")
+
+#####
+#ANALYSIS
 for(i in Years){
   print(paste0("Year: ",i))  #loop in years of analysis
   
@@ -59,43 +99,30 @@ for(i in Years){
       for(l in Months){
         ras <- raster(paste0(path,imageFilename(yr=i,mon=l)))  #read raster
         images <- stack(images, ras)  #add to stack
+        
+        images_mask <- mask(images,buf)
       }
       
-      freqs <- 0  #create dummy object
+      freqs <- 0  #create dummy object for frequencies from images
+      freqs_mask <- 0 #create dummy object for frequencies from masked images
       
       if(k > 1) { 
         totals <- sum(images)   #if more than one image in the window, calc sum of all images in the stack
         freqs <- freq(totals)   #then calc freq on the sum 
+        
+        totals_mask <- sum(images_mask)    #if more than one image in the window, calc sum of all images in the stack
+        freqs_mask <- freq(totals_mask)    #then calc freq on the sum 
       } else {
-        freqs <- freq(images,merge=T)   #if only one image in the stack, calc freq on this using merge=T
+        freqs <- freq(images,merge=T)             #if only one image in the stack, calc freq on this using merge=T
+        freqs_mask <- freq(images_mask,merge=T)   #if only one image in the stack, calc freq on this using merge=T
       }
       
       lenfreq <- length(freqs[,1])  #returns max count + 1
+      lenfreq_mask <- length(freqs_mask[,1])  #returns max count + 1
       
-      #set count variables from the frequency table
-      zeros <- ones <- twos <- threes <- fours <- fives <- sixplus <- 0
-      zeros <- freqs[1,2]
-      if(lenfreq > 1) ones <- freqs[2,2]
-      if(lenfreq > 2) twos <- freqs[3,2]
-      if(lenfreq > 3) threes <- freqs[4,2]
-      if(lenfreq > 4) fours <- freqs[5,2]
-      if(lenfreq > 5) fives <- freqs[6,2]
-      if(lenfreq > 6) sixplus <- sum(freqs[7:lenfreq,2])
-      
-      #append data to tibble
-      clearData <- clearData %>% add_row(tibble_row(
-        Year = i,
-        WindowStart = j,
-        WindowLen  = k, 
-        Count0 = zeros,
-        Count1 = ones,
-        Count2 = twos,
-        Count3 = threes,
-        Count4 = fours,
-        Count5 = fives,
-        Count6p = sixplus),
-        Max = lenfreq-1)
-      
+      clearData_image <- appendClearData(cDt=clearData_image,yr=i, ws=j, wl=k, counts=freqs,lf=lenfreq)
+      clearData_mask <- appendClearData(cDt=clearData_mask,yr=i, ws=j, wl=k, counts=freqs_mask,lf=lenfreq_mask)
+
     }  #end [Window] Lengths loop
   }  #end StartMonth loop
 }  #end Years loop
