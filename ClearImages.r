@@ -71,8 +71,8 @@ rasPNG <- function(ras, yr, mons) {
 
 #####
 #INPUTS
-Years <- seq(2010,2010,1)   #list of Years to analyse
-StartMonth <- seq(1,3,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
+Years <- seq(2010,2011,1)   #list of Years to analyse
+StartMonth <- seq(1,12,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
 path <- "Data/ClearImages/" #path to data directory
 
 #structure for output summary data
@@ -93,9 +93,12 @@ clearData_image <- tibble(
 clearData_mask <- clearData_image
 
 #read mask data 
-buf <- st_read("/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m.shp")
+#GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
+  
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
 buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
-buf_r <- raster("/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif")
+buf_r <- raster(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif"))
 
 #plotting parms
 mycuts <- c(0,1,2,3,4,5,6,100)
