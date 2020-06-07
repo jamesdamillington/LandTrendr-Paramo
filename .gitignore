@@ -5,5 +5,6 @@
 
 /Data/
 /Documentation/
+/raster_tmp/
 *.html
 *.pdf
