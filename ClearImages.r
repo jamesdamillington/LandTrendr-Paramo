@@ -71,8 +71,8 @@ rasPNG <- function(ras, yr, mons) {
 
 #####
 #INPUTS
-Years <- seq(2010,2011,1)   #list of Years to analyse
-StartMonth <- seq(1,12,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
+Years <- seq(2019,2019,1)   #list of Years to analyse
+StartMonth <- seq(1,1,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
 path <- "Data/ClearImages/" #path to data directory
 
 #structure for output summary data
@@ -120,6 +120,13 @@ for(i in Years){
     for(k in Lengths){  #loop on possible Window Lengths for this StartMonth
       print(paste0("Window Length: ",k))
       
+      
+      ##MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+      raster_tmp_dir <- "raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+      dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+      rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+      ##
+      
       Months <- seq(from=j,length.out=k)  #create list of months for this StartMonth-WindowLength (j-k) combo 
       images <- stack()   #empty stack to hold rasters read in next loop
       
@@ -128,9 +135,9 @@ for(i in Years){
       for(l in Months){
         ras <- raster(paste0(path,imageFilename(yr=i,mon=l)))  #read raster
         images <- stack(images, ras)  #add to stack
-        
-        images_mask <- mask(images,buf_r) #apply mask to the stack
       }
+      
+      images_mask <- mask(images,buf_r) #apply mask to the stack
       
       freqs <- 0  #create dummy object for frequencies from images
       freqs_mask <- 0 #create dummy object for frequencies from masked images
@@ -164,6 +171,9 @@ for(i in Years){
       clearData_image <- appendClearData(cDt=clearData_image,yr=i, ws=j, wl=k, counts=freqs,lf=lenfreq)
       clearData_mask <- appendClearData(cDt=clearData_mask,yr=i, ws=j, wl=k, counts=freqs_mask,lf=lenfreq_mask)
 
+      ## remove the tmp dir
+      unlink(raster_tmp_dir, recursive = T, force = T)
+      
     }  #end [Window] Lengths loop
   }  #end StartMonth loop
 }  #end Years loop
