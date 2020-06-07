@@ -1,8 +1,10 @@
 ---
 title: "LandTrendr-Paramo Clear Image Analysis"
 author: "James Millington"
-date: "2020-06-02"
-output: github_document
+date: "2020-06-07"
+output: 
+  github_document:
+    toc: true
 ---
  
 # Clear Images Analysis
@@ -23,12 +25,13 @@ Identifying the length of window 3. demands examining the number of cloud free p
 ## Data 
   
 There data are for 2010-2019 with the following file-naming convention:
+
 - ClearMon0 is 2010
 - ClearMon5 is 2015
 
 
 ### Visualise Examples of the Data 
-```{r}
+```{r message=F}
 library(raster)
 
 dat1 <- raster("Data/ClearImages/ClearJan0.tif")
@@ -45,10 +48,12 @@ plot(sd, main="Sum")
 ### Check masking
 
 First, read shp and check it aligns with raster
-```{r}
+```{r message=F, warning=F}
 library(sf)
+#GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
 
-buf <- st_read("/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m.shp")
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
 
 #set crs of shp to same as for raster
 buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
@@ -79,7 +84,7 @@ print(paste0("Cells in original: ", ncell(buf_r)))
 
 Save the raster to file for use elsewhere:
 ```{r eval=F}
-writeRaster(buf_r, "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif")
+writeRaster(buf_r, paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif"))
 
 ```
 
@@ -278,7 +283,7 @@ write_csv(x=clearData_mask,
 
 ### Initial Summary Visualization
 
-```{r}
+```{r message=F}
 
 library(tidyverse)
 path <- "Data/ClearImages/" #path to data directory
@@ -343,9 +348,9 @@ dat %>%
 
 dat %>%
   filter(Year < 2012) %>%
-  mutate_at(vars(matches("Year")),funs(factor)) %>%
-  mutate_at(vars(matches("WindowLen")),funs(factor)) %>%
-  mutate_at(vars(matches("WindowStart")),funs(factor)) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+  mutate(across(matches("WindowStart"),as.factor)) %>%
   ggplot(aes(x=WindowLen, y=WindowStart, size=Count0)) +
   #scale_color_gradient(low="yellow", high="red") + 
   geom_point(shape=15) + 
@@ -355,7 +360,7 @@ dat %>%
 
 ```
 
-### Multi-Year January Visualisation
+## Multi-Year January Visualisation
 
 As windows starting in January seem to consistently have the greatest cloud-free pixels, let's focus on that now after having run the script for widows starting only in January and for both entire image and masked to study area. Furthermore, data above show that:
 
@@ -364,7 +369,7 @@ As windows starting in January seem to consistently have the greatest cloud-free
 
 So, let's focus here on WindowLengths of 12 and 4
 
-```{r}
+```{r message=F}
 #load data
 path <- "Data/ClearImages/" #path to data directory
 dat_Jan_1018 <- read_csv(paste0(path,"ClearImages_ImageSummary_2010-2018_Jan-Jan.csv"))
@@ -372,7 +377,7 @@ dat_Jan_1018_mask <- read_csv(paste0(path,"ClearImages_MaskSummary_2010-2018_Jan
 
 ```
 
-Entire Image, Window Length 12
+### Entire Image, Window Length 12
 ```{r}
 
 total_cells <- ncell(buf_r)
@@ -408,10 +413,14 @@ dat_Jan_1018 %>%
   geom_text(aes(label=round(prop,3),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
 
 ```
-So, in 2016 we have a full-year window with all cloud-free images:
+
+So, in 2016 we have a full-year window with almost 100% cloud-free images, but in 2010 and 2011 we have ~7% of pixels with no cloud-free image.
+
+![Map of 2016 Entire Image, Window Length 12](Data/ClearImages/ClearImagesTotals_2016_Jan-Dec.png)
+![Map of 2011 Entire Image, Window Length 12](Data/ClearImages/ClearImagesTotals_2011_Jan-Dec.png)
 
 
-Entire Image, Window Length 4
+### Entire Image, Window Length 4
 ```{r}
 
 total_cells <- ncell(buf_r)
@@ -444,11 +453,16 @@ dat_Jan_1018 %>%
   #facet_grid(.~Year) +
   scale_y_continuous(name="Image Proportion") +
   ggtitle("Entire Image, Window Length 4") +
-  geom_text(aes(label=round(prop,2),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
+  geom_text(aes(label=round(prop,3),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
 
 ```
 
-Study Area, Window Length 12
+When we look at a window length of 4 months (starting in Jan) for the entire image, we see earlier years have upto 25% pixels are not cloud-free (e.g. 2013), although again 2016 is quite clear.  
+
+![Map of 2016 Entire Image, Window Length 4](Data/ClearImages/ClearImagesTotals_2016_Jan-Apr.png)
+![Map of 2013 Entire Image, Window Length 4](Data/ClearImages/ClearImagesTotals_2013_Jan-Apr.png)
+
+### Study Area, Window Length 12
 ```{r}
 
 total_cells <- cellStats(buf_r, sum)
@@ -483,11 +497,15 @@ dat_Jan_1018_mask %>%
   #facet_grid(.~Year) +
   scale_y_continuous(name="Study Area Proportion") +
   ggtitle("StudyArea, Window Length 12") +
-  geom_text(aes(label=round(prop,2),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
+  geom_text(aes(label=round(prop,3),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
 
 ```
 
-Study Area, Window Length 4
+Considering the study area only (for a 12 month window), we find that this is generally more cloudy in early year, but not so bad from 2014 onwards. 
+
+![Map of 2010 Entire Image, Window Length 12](Data/ClearImages/ClearImagesTotals_2010_Jan-Dec.png)
+
+### Study Area, Window Length 4
 ```{r}
 
 total_cells <- cellStats(buf_r, sum)
@@ -522,7 +540,19 @@ dat_Jan_1018_mask %>%
   #facet_grid(.~Year) +
   scale_y_continuous(name="Study Area Proportion") +
   ggtitle("StudyArea, Window Length 4") +
-  geom_text(aes(label=round(prop,2),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
+  geom_text(aes(label=round(prop,3),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
 
 ```
 
+It's a similar issue when we look at 4 month window for the study area, but 2013 is particularly bad with more than half of pixels having no cloud-free image. 
+
+## Concluding Thoughts
+
+- Entire year gives more cloud-free pixels 
+- Study area with Jan-Apr windows will lose a lot of data for years prior to 2014
+- Study area with Jan-Dec window looks feasible for analysis for 2012 onwardS
+- Why is 2014 onwards so much more cloud free? Was a new Landsat sensor added? Some re-calibration?
+
+Next step in analysis is to identify proportion of pixels in the study area with >1 consecutive years with no cloud-free image? i.e. Pixels with one year missing here-or-there could be included in LandTrendR analyses, but pixels with multi-years of missing data should be ommited from the analysis?
+
+What other analyses?

@@ -1,7 +1,25 @@
 LandTrendr-Paramo Clear Image Analysis
 ================
 James Millington
-2020-06-02
+2020-06-07
+
+  - [Clear Images Analysis](#clear-images-analysis)
+      - [Rationale](#rationale)
+      - [Data](#data)
+          - [Visualise Examples of the
+            Data](#visualise-examples-of-the-data)
+          - [Create Data Summary](#create-data-summary)
+          - [Initial Summary
+            Visualization](#initial-summary-visualization)
+      - [Multi-Year January
+        Visualisation](#multi-year-january-visualisation)
+          - [Entire Image, Window Length
+            12](#entire-image-window-length-12)
+          - [Entire Image, Window Length
+            4](#entire-image-window-length-4)
+          - [Study Area, Window Length 12](#study-area-window-length-12)
+          - [Study Area, Window Length 4](#study-area-window-length-4)
+      - [Concluding Thoughts](#concluding-thoughts)
 
 # Clear Images Analysis
 
@@ -37,17 +55,15 @@ year?*
 ## Data
 
 There data are for 2010-2019 with the following file-naming convention:
-- ClearMon0 is 2010 - ClearMon5 is 2015
+
+  - ClearMon0 is 2010
+  - ClearMon5 is 2015
 
 ### Visualise Examples of the Data
 
 ``` r
 library(raster)
-```
 
-    ## Loading required package: sp
-
-``` r
 dat1 <- raster("Data/ClearImages/ClearJan0.tif")
 dat2 <- raster("Data/ClearImages/ClearFeb0.tif")
 
@@ -69,7 +85,85 @@ plot(dat2, main = "Image2")
 plot(sd, main="Sum")
 ```
 
-![](ClearImages_files/figure-gfm/unnamed-chunk-1-3.png)<!-- -->
+![](ClearImages_files/figure-gfm/unnamed-chunk-1-3.png)<!-- --> \#\#\#
+Check masking
+
+First, read shp and check it aligns with raster
+
+``` r
+library(sf)
+#GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
+
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
+```
+
+    ## Reading layer `GroundTruthingBuffer500m' from data source `E:\OneDrive - King's College London\Research\Projects\ColombiaBIO\Fire\Fire GIS Files\500mbufferOfComplejos\GroundTruthingBuffer500m.shp' using driver `ESRI Shapefile'
+    ## Simple feature collection with 17 features and 11 fields
+    ## geometry type:  POLYGON
+    ## dimension:      XY
+    ## bbox:           xmin: 1024933 ymin: 1060489 xmax: 1197690 ymax: 1202938
+    ## projected CRS:  MAGNA_SIRGAS_Colombia_Bogota_zone
+
+``` r
+#set crs of shp to same as for raster
+buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
+
+#check 
+plot(sd)
+plot(st_geometry(buf), add=T)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+
+Now rasterise the buffer shp and use this as a mask
+
+``` r
+buf_r <- rasterize(buf, sd, field=1)
+```
+
+    ## Warning in showSRID(uprojargs, format = "PROJ", multiline = "NO"): Discarded datum Unknown based on WGS84 ellipsoid in CRS definition,
+    ##  but +towgs84= values preserved
+
+``` r
+sd_b <- mask(sd, buf)
+```
+
+    ## Warning in showSRID(uprojargs, format = "PROJ", multiline = "NO"): Discarded datum Unknown based on WGS84 ellipsoid in CRS definition,
+    ##  but +towgs84= values preserved
+
+``` r
+plot(buf_r)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+
+``` r
+plot(sd_b)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-3-2.png)<!-- -->
+
+We can check the number of cells in the masked raster (compared to the
+original image0
+
+``` r
+print(paste0("Cells in mask: ", cellStats(buf_r, sum)))
+```
+
+    ## [1] "Cells in mask: 5719877"
+
+``` r
+print(paste0("Cells in original: ", ncell(buf_r)))
+```
+
+    ## [1] "Cells in original: 54467320"
+
+Save the raster to file for use elsewhere:
+
+``` r
+writeRaster(buf_r, paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif"))
+```
 
 ### Create Data Summary
 
@@ -85,6 +179,11 @@ completeness, but best run using ClearImages.r independently.
 ``` r
 library(raster)
 library(tidyverse)
+library(RColorBrewer)
+library(sf)
+
+#####
+#FUNCTIONS
 
 #function to create image filename from year and month values
 imageFilename <- function(yr,mon){
@@ -97,13 +196,59 @@ imageFilename <- function(yr,mon){
   
 }
 
+#function to add data for this window to the summary data tibble 
+appendClearData <- function(cDt, yr, ws, wl, counts, lf){
+  
+  #set count variables from the frequency table
+  zeros <- ones <- twos <- threes <- fours <- fives <- sixplus <- 0
+  zeros <- counts[1,2]
+  if(lf > 1) ones <- counts[2,2]
+  if(lf > 2) twos <- counts[3,2]
+  if(lf > 3) threes <- counts[4,2]
+  if(lf > 4) fours <- counts[5,2]
+  if(lf > 5) fives <- counts[6,2]
+  if(lf > 6) sixplus <- sum(counts[7:lf,2])
+  
+  #append data to tibble
+  cDt <- cDt %>% add_row(tibble_row(
+    Year = yr,
+    WindowStart = ws,
+    WindowLen  = wl, 
+    Count0 = zeros,
+    Count1 = ones,
+    Count2 = twos,
+    Count3 = threes,
+    Count4 = fours,
+    Count5 = fives,
+    Count6p = sixplus),
+    Max = lf-1)
+  
+  #return tibble (overwrite)
+  return(cDt)
+}
+
+#function to write raster to png
+rasPNG <- function(ras, yr, mons) {
+  
+  png(filename=paste0(path,"ClearImagesTotals_",yr,"_",month.abb[head(mons,1)],"-",month.abb[tail(mons,1)],".png"))
+  
+  #first plot without legend
+  plot(ras, breaks=mycuts, col=mypal(length(mycuts)), legend=FALSE, main=paste0(yr," ",month.abb[head(mons,1)],"-",month.abb[tail(mons,1)]))
+  legend("right", legend=as.character(mycuts),fill=mypal(length(mycuts)))   #add custom legend
+  plot(st_geometry(buf), border="red",add=T) #add paramo buffer area
+  
+  dev.off()
+}
+
+
+#####
 #INPUTS
-Years <- seq(2010,2010,1)   #list of Years to analyse
-StartMonth <- seq(10,11,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
+Years <- seq(2019,2019,1)   #list of Years to analyse
+StartMonth <- seq(1,1,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
 path <- "Data/ClearImages/" #path to data directory
 
-#structure for output data
-clearData <- tibble(
+#structure for output summary data
+clearData_image <- tibble(
   Year = numeric(),         #year this window is in
   WindowStart = numeric(),  #month in which the window starts
   WindowLen = numeric(),    #number of months in this window
@@ -117,9 +262,26 @@ clearData <- tibble(
   Max = numeric()           #max number of cloud free images in this window (should be equivalent to total number of images in the window)
 )
 
-#start analysis loop
+clearData_mask <- clearData_image
+
+#read mask data 
+#GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
+  
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
+buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
+buf_r <- raster(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif"))
+
+#plotting parms
+mycuts <- c(0,1,2,3,4,5,6,100)
+mypal <- colorRampPalette(c("white","black"))
+
+
+
+#####
+#ANALYSIS
 for(i in Years){
-  print(paste0("Year: ",i))  #loop in years of analysis
+  print(paste0("Year: ",i))  #loop on years of analysis
   
   for(j in StartMonth){
     print(paste0("Start Mon: ",month.abb[j]))  #loop on StartMonth of analysis
@@ -127,8 +289,15 @@ for(i in Years){
     max_wl = 13 - j   #max window length possible for this StartMonth (12 for Jan, 11 for Feb, ... 1 for Dec)
     Lengths <- seq(from=1,to=max_wl,by=1)   #create a list of possible window lengths for next loop
     
-    for(k in Lengths){
+    for(k in Lengths){  #loop on possible Window Lengths for this StartMonth
       print(paste0("Window Length: ",k))
+      
+      
+      ##MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+      raster_tmp_dir <- "raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+      dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+      rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+      ##
       
       Months <- seq(from=j,length.out=k)  #create list of months for this StartMonth-WindowLength (j-k) combo 
       images <- stack()   #empty stack to hold rasters read in next loop
@@ -140,87 +309,62 @@ for(i in Years){
         images <- stack(images, ras)  #add to stack
       }
       
-      freqs <- 0  #create dummy object
+      images_mask <- mask(images,buf_r) #apply mask to the stack
+      
+      freqs <- 0  #create dummy object for frequencies from images
+      freqs_mask <- 0 #create dummy object for frequencies from masked images
       
       if(k > 1) { 
         totals <- sum(images)   #if more than one image in the window, calc sum of all images in the stack
         freqs <- freq(totals)   #then calc freq on the sum 
+        
+        totals_mask <- sum(images_mask)    #if more than one image in the window, calc sum of all images in the stack
+        freqs_mask <- freq(totals_mask)    #then calc freq on the sum 
+        
+        #if StartMonth is Jan, output .tif of cell sums (write full image only, can mask this later if needed in subsequent analysis)
+        if(j==1) writeRaster(totals, filename=paste0(path,"ClearImagesTotals_",i,"_",month.abb[head(Months,1)],"-",month.abb[tail(Months,1)],".tif"),datatype="INT2S")
+        rasPNG(ras=totals,yr=i, mons=Months)    #always write png 
+        
+      
       } else {
-        freqs <- freq(images,merge=T)   #if only one image in the stack, calc freq on this using merge=T
+        freqs <- freq(images,merge=T)             #else, only one image in the stack, calc freq on this using merge=T
+        freqs_mask <- freq(images_mask,merge=T)   #else, only one image in the stack, calc freq on this using merge=T
+        
+        #if StartMonth is Jan, output raster of cell sums (write full image only, can mask this later if needed in subsequent analysis)
+        if(j==1) writeRaster(images, filename=paste0(path,"ClearImagesTotals_",i,"_",month.abb[head(Months,1)],"-",month.abb[tail(Months,1)],".tif"),datatype="INT2S")
+        rasPNG(ras=images,yr=i, mons=Months)      #always write png 
+        
       }
-      
+
       lenfreq <- length(freqs[,1])  #returns max count + 1
+      lenfreq_mask <- length(freqs_mask[,1])  #returns max count + 1
       
-      #set count variables from the frequency table
-      zeros <- ones <- twos <- threes <- fours <- fives <- sixplus <- 0
-      zeros <- freqs[1,2]
-      if(lenfreq > 1) ones <- freqs[2,2]
-      if(lenfreq > 2) twos <- freqs[3,2]
-      if(lenfreq > 3) threes <- freqs[4,2]
-      if(lenfreq > 4) fours <- freqs[5,2]
-      if(lenfreq > 5) fives <- freqs[6,2]
-      if(lenfreq > 6) sixplus <- sum(freqs[7:lenfreq,2])
-      
-      #append data to tibble
-      clearData <- clearData %>% add_row(tibble_row(
-        Year = i,
-        WindowStart = j,
-        WindowLen  = k, 
-        Count0 = zeros,
-        Count1 = ones,
-        Count2 = twos,
-        Count3 = threes,
-        Count4 = fours,
-        Count5 = fives,
-        Count6p = sixplus),
-        Max = lenfreq-1)
+      #add data for this window start-length combo to the summary data table
+      clearData_image <- appendClearData(cDt=clearData_image,yr=i, ws=j, wl=k, counts=freqs,lf=lenfreq)
+      clearData_mask <- appendClearData(cDt=clearData_mask,yr=i, ws=j, wl=k, counts=freqs_mask,lf=lenfreq_mask)
+
+      ## remove the tmp dir
+      unlink(raster_tmp_dir, recursive = T, force = T)
       
     }  #end [Window] Lengths loop
   }  #end StartMonth loop
 }  #end Years loop
 
-write_csv(x=clearData,
-          path=paste0(path,"ClearImagesSummary_",head(Years,1),"-",tail(Years,1),"_",month.abb[head(StartMonth,1)],"-",month.abb[tail(StartMonth,1)],".csv"))
+#output summary data tables
+write_csv(x=clearData_image,
+          path=paste0(path,"ClearImages_ImageSummary_",head(Years,1),"-",tail(Years,1),"_",month.abb[head(StartMonth,1)],"-",month.abb[tail(StartMonth,1)],".csv"))
+
+write_csv(x=clearData_mask,
+          path=paste0(path,"ClearImages_MaskSummary_",head(Years,1),"-",tail(Years,1),"_",month.abb[head(StartMonth,1)],"-",month.abb[tail(StartMonth,1)],".csv"))
 ```
+
+### Initial Summary Visualization
 
 ``` r
 library(tidyverse)
-```
-
-    ## ── Attaching packages ──────────────────────────────────────────────────────────────────────────────────── tidyverse 1.3.0 ──
-
-    ## ✓ ggplot2 3.3.1     ✓ purrr   0.3.4
-    ## ✓ tibble  3.0.1     ✓ dplyr   1.0.0
-    ## ✓ tidyr   1.1.0     ✓ stringr 1.4.0
-    ## ✓ readr   1.3.1     ✓ forcats 0.5.0
-
-    ## ── Conflicts ─────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
-    ## x tidyr::extract() masks raster::extract()
-    ## x dplyr::filter()  masks stats::filter()
-    ## x dplyr::lag()     masks stats::lag()
-    ## x dplyr::select()  masks raster::select()
-
-``` r
 path <- "Data/ClearImages/" #path to data directory
 dat <- read_csv(paste0(path,"ClearImagesSummary_2010-2011_Jan-Dec.csv"))
 ```
-
-    ## Parsed with column specification:
-    ## cols(
-    ##   Year = col_double(),
-    ##   WindowStart = col_double(),
-    ##   WindowLen = col_double(),
-    ##   Count0 = col_double(),
-    ##   Count1 = col_double(),
-    ##   Count2 = col_double(),
-    ##   Count3 = col_double(),
-    ##   Count4 = col_double(),
-    ##   Count5 = col_double(),
-    ##   Count6p = col_double(),
-    ##   Max = col_double()
-    ## )
-
-### Initial Summary Visualization
 
 ``` r
 #plot count0 against window length (group by year, windows starting from Jan)
@@ -235,7 +379,7 @@ dat %>%
   ggtitle("All Windows Start in Jan")
 ```
 
-![](ClearImages_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](ClearImages_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 ``` r
 dat %>%
@@ -249,7 +393,7 @@ dat %>%
   ggtitle("All Windows Start in Jan")
 ```
 
-![](ClearImages_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](ClearImages_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 In next plot, `Count0` is count of pixels that are not cloud free in the
 window, `Count1` is count of pixels that have one cloud free image in
@@ -275,16 +419,16 @@ dat %>%
   ggtitle("All Windows Start in Jan")
 ```
 
-![](ClearImages_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](ClearImages_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ``` r
 #plot count0 (point size) by window length (y) and StartMonth (x)  (shape  by year)
 
 dat %>%
   filter(Year < 2012) %>%
-  mutate_at(vars(matches("Year")),funs(factor)) %>%
-  mutate_at(vars(matches("WindowLen")),funs(factor)) %>%
-  mutate_at(vars(matches("WindowStart")),funs(factor)) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+  mutate(across(matches("WindowStart"),as.factor)) %>%
   ggplot(aes(x=WindowLen, y=WindowStart, size=Count0)) +
   #scale_color_gradient(low="yellow", high="red") + 
   geom_point(shape=15) + 
@@ -293,18 +437,240 @@ dat %>%
   ggtitle("Non-Cloud Free")
 ```
 
-    ## Warning: `funs()` is deprecated as of dplyr 0.8.0.
-    ## Please use a list of either functions or lambdas: 
-    ## 
-    ##   # Simple named list: 
-    ##   list(mean = mean, median = median)
-    ## 
-    ##   # Auto named with `tibble::lst()`: 
-    ##   tibble::lst(mean, median)
-    ## 
-    ##   # Using lambdas
-    ##   list(~ mean(., trim = .2), ~ median(., na.rm = TRUE))
-    ## This warning is displayed once every 8 hours.
-    ## Call `lifecycle::last_warnings()` to see where this warning was generated.
+![](ClearImages_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
-![](ClearImages_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+## Multi-Year January Visualisation
+
+As windows starting in January seem to consistently have the greatest
+cloud-free pixels, let’s focus on that now after having run the script
+for widows starting only in January and for both entire image and masked
+to study area. Furthermore, data above show that:
+
+  - entire year windws (i.e. WindowLength == 12) have greatest
+    cloud-free images
+  - there is rapid increase in number of cloud-free pixels until
+    WindowLength == 5 when improvements slow.
+
+So, let’s focus here on WindowLengths of 12 and 4
+
+``` r
+#load data
+path <- "Data/ClearImages/" #path to data directory
+dat_Jan_1018 <- read_csv(paste0(path,"ClearImages_ImageSummary_2010-2018_Jan-Jan.csv"))
+dat_Jan_1018_mask <- read_csv(paste0(path,"ClearImages_MaskSummary_2010-2018_Jan-Jan.csv"))
+```
+
+### Entire Image, Window Length 12
+
+``` r
+total_cells <- ncell(buf_r)
+
+countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
+
+dat_Jan_1018 %>%
+  filter(WindowLen == 12) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+  mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
+  dplyr::select(c(Year,starts_with("Window") | ends_with("prop"))) %>%
+  pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>%
+  ggplot(aes(x=Year, y=prop, fill=Count)) +
+  geom_bar(stat="identity",position="fill") +
+  #facet_grid(.~Year) +
+  scale_y_continuous(name="Image Proportion") +
+  ggtitle("Entire Image, Window Length 12")  
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+
+``` r
+dat_Jan_1018 %>%
+  filter(WindowLen == 12) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+  mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
+  dplyr::select(c(Year,Count0prop,starts_with("Window"))) %>% 
+  pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>% 
+  ggplot(aes(x=Year, y=prop, fill=Count)) +
+  geom_bar(stat="identity") +
+  #facet_grid(.~Year) +
+  scale_y_continuous(name="Image Proportion") +
+  ggtitle("Entire Image, Window Length 12") +
+  geom_text(aes(label=round(prop,3),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-13-2.png)<!-- -->
+
+So, in 2016 we have a full-year window with almost 100% cloud-free
+images, but in 2010 and 2011 we have \~7% of pixels with no cloud-free
+image.
+
+![Map of 2016 Entire Image, Window Length
+12](Data/ClearImages/ClearImagesTotals_2016_Jan-Dec.png) ![Map of 2011
+Entire Image, Window Length
+12](Data/ClearImages/ClearImagesTotals_2011_Jan-Dec.png)
+
+### Entire Image, Window Length 4
+
+``` r
+total_cells <- ncell(buf_r)
+
+countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
+
+dat_Jan_1018 %>%
+  filter(WindowLen == 4) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+  mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
+  dplyr::select(c(Year,starts_with("Window") | ends_with("prop"))) %>%
+  pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>%
+  ggplot(aes(x=Year, y=prop, fill=Count)) +
+  geom_bar(stat="identity",position="fill") +
+  #facet_grid(.~Year) +
+  scale_y_continuous(name="Image Proportion") +
+  ggtitle("Entire Image, Window Length 4")  
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+
+``` r
+dat_Jan_1018 %>%
+  filter(WindowLen == 4) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+  mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
+  dplyr::select(c(Year,Count0prop,starts_with("Window"))) %>% 
+  pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>% 
+  ggplot(aes(x=Year, y=prop, fill=Count)) +
+  geom_bar(stat="identity") +
+  #facet_grid(.~Year) +
+  scale_y_continuous(name="Image Proportion") +
+  ggtitle("Entire Image, Window Length 4") +
+  geom_text(aes(label=round(prop,3),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-14-2.png)<!-- -->
+
+When we look at a window length of 4 months (starting in Jan) for the
+entire image, we see earlier years have upto 25% pixels are not
+cloud-free (e.g. 2013), although again 2016 is quite clear.
+
+![Map of 2016 Entire Image, Window Length
+4](Data/ClearImages/ClearImagesTotals_2016_Jan-Apr.png) ![Map of 2013
+Entire Image, Window Length
+4](Data/ClearImages/ClearImagesTotals_2013_Jan-Apr.png)
+
+### Study Area, Window Length 12
+
+``` r
+total_cells <- cellStats(buf_r, sum)
+
+countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
+
+dat_Jan_1018_mask %>%
+  filter(WindowLen == 12) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+  mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
+  dplyr::select(c(Year,starts_with("Window") | ends_with("prop"))) %>%
+  pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>%
+  ggplot(aes(x=Year, y=prop, fill=Count)) +
+  geom_bar(stat="identity",position="fill") +
+  #facet_grid(.~Year) +
+  scale_y_continuous(name="Study Area Proportion") +
+  ggtitle("Study Area, Window Length 12")  
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+
+``` r
+dat_Jan_1018_mask %>%
+  filter(WindowLen == 12) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+  mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
+  dplyr::select(c(Year,Count0prop,starts_with("Window"))) %>% 
+  pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>% 
+  ggplot(aes(x=Year, y=prop, fill=Count)) +
+  geom_bar(stat="identity") +
+  #facet_grid(.~Year) +
+  scale_y_continuous(name="Study Area Proportion") +
+  ggtitle("StudyArea, Window Length 12") +
+  geom_text(aes(label=round(prop,3),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-15-2.png)<!-- -->
+
+Considering the study area only (for a 12 month window), we find that
+this is generally more cloudy in early year, but not so bad from 2014
+onwards.
+
+![Map of 2010 Entire Image, Window Length
+12](Data/ClearImages/ClearImagesTotals_2010_Jan-Dec.png)
+
+### Study Area, Window Length 4
+
+``` r
+total_cells <- cellStats(buf_r, sum)
+
+countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
+
+dat_Jan_1018_mask %>%
+  filter(WindowLen == 4) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+  mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
+  dplyr::select(c(Year,starts_with("Window") | ends_with("prop"))) %>%
+  pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>%
+  ggplot(aes(x=Year, y=prop, fill=Count)) +
+  geom_bar(stat="identity",position="fill") +
+  #facet_grid(.~Year) +
+  scale_y_continuous(name="Study Area Proportion") +
+  ggtitle("Study Area, Window Length 4")  
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+
+``` r
+dat_Jan_1018_mask %>%
+  filter(WindowLen == 4) %>%
+  mutate(across(matches("Year"),as.factor)) %>%
+  mutate(across(matches("WindowLen"),as.factor)) %>%
+    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+  mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
+  dplyr::select(c(Year,Count0prop,starts_with("Window"))) %>% 
+  pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>% 
+  ggplot(aes(x=Year, y=prop, fill=Count)) +
+  geom_bar(stat="identity") +
+  #facet_grid(.~Year) +
+  scale_y_continuous(name="Study Area Proportion") +
+  ggtitle("StudyArea, Window Length 4") +
+  geom_text(aes(label=round(prop,3),x=Year,y=prop), position=position_dodge(width=0.8), vjust=-0.3)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-16-2.png)<!-- -->
+
+It’s a similar issue when we look at 4 month window for the study area,
+but 2013 is particularly bad with more than half of pixels having no
+cloud-free image.
+
+## Concluding Thoughts
+
+  - Entire year gives more cloud-free pixels
+  - Study area with Jan-Apr windows will lose a lot of data for years
+    prior to 2014
+  - Study area with Jan-Dec window looks feasible for analysis for 2012
+    onwardS
+  - Why is 2014 onwards so much more cloud free? Was a new Landsat
+    sensor added? Some re-calibration?
+
+Next step in analysis is to identify proportion of pixels in the study
+area with \>1 consecutive years with no cloud-free image? i.e. Pixels
+with one year missing here-or-there could be included in LandTrendR
+analyses, but pixels with multi-years of missing data should be ommited
+from the analysis?
+
+What other analyses?
