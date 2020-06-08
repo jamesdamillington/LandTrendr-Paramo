@@ -19,7 +19,7 @@ imageFilename <- function(yr,mon){
   y = yr %% 2010
   m = month.abb[mon]    #month.abb is built-in 
   fn = paste0("Clear",m,y,".tif")
-  #print(fn)
+  print(fn)
   return(fn)
   
 }
@@ -71,7 +71,7 @@ rasPNG <- function(ras, yr, mons) {
 
 #####
 #INPUTS
-Years <- seq(2019,2019,1)   #list of Years to analyse
+Years <- seq(2020,2020,1)   #list of Years to analyse
 StartMonth <- seq(1,1,1)  #list of StartMonths to analyse (1 is Jan, 12 is Dec)
 path <- "Data/ClearImages/" #path to data directory
 
@@ -93,8 +93,8 @@ clearData_image <- tibble(
 clearData_mask <- clearData_image
 
 #read mask data 
-#GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
-GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
+GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+#GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
   
 buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
 buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
@@ -132,13 +132,13 @@ for(i in Years){
       
       #create the stack of rasters for this window length
       #loop through months in the StartMonth-WindowLength combo
+      print("reading files...")
       for(l in Months){
         ras <- raster(paste0(path,imageFilename(yr=i,mon=l)))  #read raster
         images <- stack(images, ras)  #add to stack
       }
       
-      images_mask <- mask(images,buf_r) #apply mask to the stack
-      
+      print("Masking, calc freqs")
       freqs <- 0  #create dummy object for frequencies from images
       freqs_mask <- 0 #create dummy object for frequencies from masked images
       
@@ -146,31 +146,38 @@ for(i in Years){
         totals <- sum(images)   #if more than one image in the window, calc sum of all images in the stack
         freqs <- freq(totals)   #then calc freq on the sum 
         
-        totals_mask <- sum(images_mask)    #if more than one image in the window, calc sum of all images in the stack
+        totals_mask <- mask(totals,buf_r) #apply mask to the sum raster
+        
+        #totals_mask <- sum(images_mask)    #if more than one image in the window, calc sum of all images in the stack
         freqs_mask <- freq(totals_mask)    #then calc freq on the sum 
         
         #if StartMonth is Jan, output .tif of cell sums (write full image only, can mask this later if needed in subsequent analysis)
-        if(j==1) writeRaster(totals, filename=paste0(path,"ClearImagesTotals_",i,"_",month.abb[head(Months,1)],"-",month.abb[tail(Months,1)],".tif"),datatype="INT2S")
+        print("Writing files")
+        if(j==1) writeRaster(totals, filename=paste0(path,"ClearImagesTotals_",i,"_",month.abb[head(Months,1)],"-",month.abb[tail(Months,1)],".tif"),datatype="INT2S",overwrite=T)
         rasPNG(ras=totals,yr=i, mons=Months)    #always write png 
         
       
       } else {
         freqs <- freq(images,merge=T)             #else, only one image in the stack, calc freq on this using merge=T
+        
+        images_mask <- mask(images,buf_r)
         freqs_mask <- freq(images_mask,merge=T)   #else, only one image in the stack, calc freq on this using merge=T
         
         #if StartMonth is Jan, output raster of cell sums (write full image only, can mask this later if needed in subsequent analysis)
-        if(j==1) writeRaster(images, filename=paste0(path,"ClearImagesTotals_",i,"_",month.abb[head(Months,1)],"-",month.abb[tail(Months,1)],".tif"),datatype="INT2S")
+        print("Writing files")
+        if(j==1) writeRaster(images, filename=paste0(path,"ClearImagesTotals_",i,"_",month.abb[head(Months,1)],"-",month.abb[tail(Months,1)],".tif"),datatype="INT2S",overwrite=T)
         rasPNG(ras=images,yr=i, mons=Months)      #always write png 
         
       }
 
       lenfreq <- length(freqs[,1])  #returns max count + 1
-      lenfreq_mask <- length(freqs_mask[,1])  #returns max count + 1
+      lenfreq_mask <- length(freqs_mask[,1]) - 1  #returns max count + 2 because there are many NAs in mask (so do additional subtract)
       
       #add data for this window start-length combo to the summary data table
       clearData_image <- appendClearData(cDt=clearData_image,yr=i, ws=j, wl=k, counts=freqs,lf=lenfreq)
       clearData_mask <- appendClearData(cDt=clearData_mask,yr=i, ws=j, wl=k, counts=freqs_mask,lf=lenfreq_mask)
 
+      print("unlink")
       ## remove the tmp dir
       unlink(raster_tmp_dir, recursive = T, force = T)
       
