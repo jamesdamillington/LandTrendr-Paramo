@@ -92,18 +92,18 @@ First, read shp and check it aligns with raster
 
 ``` r
 library(sf)
-#GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
-GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
+GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+#GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
 
 buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
 ```
 
-    ## Reading layer `GroundTruthingBuffer500m' from data source `E:\OneDrive - King's College London\Research\Projects\ColombiaBIO\Fire\Fire GIS Files\500mbufferOfComplejos\GroundTruthingBuffer500m.shp' using driver `ESRI Shapefile'
+    ## Reading layer `GroundTruthingBuffer500m' from data source `/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/500mbufferOfComplejos/GroundTruthingBuffer500m.shp' using driver `ESRI Shapefile'
     ## Simple feature collection with 17 features and 11 fields
     ## geometry type:  POLYGON
     ## dimension:      XY
     ## bbox:           xmin: 1024933 ymin: 1060489 xmax: 1197690 ymax: 1202938
-    ## projected CRS:  MAGNA_SIRGAS_Colombia_Bogota_zone
+    ## CRS:            3116
 
 ``` r
 #set crs of shp to same as for raster
@@ -120,19 +120,8 @@ Now rasterise the buffer shp and use this as a mask
 
 ``` r
 buf_r <- rasterize(buf, sd, field=1)
-```
-
-    ## Warning in showSRID(uprojargs, format = "PROJ", multiline = "NO"): Discarded datum Unknown based on WGS84 ellipsoid in CRS definition,
-    ##  but +towgs84= values preserved
-
-``` r
 sd_b <- mask(sd, buf)
-```
 
-    ## Warning in showSRID(uprojargs, format = "PROJ", multiline = "NO"): Discarded datum Unknown based on WGS84 ellipsoid in CRS definition,
-    ##  but +towgs84= values preserved
-
-``` r
 plot(buf_r)
 ```
 
@@ -506,9 +495,8 @@ images, but in 2010 and 2011 we have \~7% of pixels with no cloud-free
 image.
 
 ![Map of 2016 Entire Image, Window Length
-12](Data/ClearImages/ClearImagesTotals_2016_Jan-Dec.png) ![Map of 2011
-Entire Image, Window Length
-12](Data/ClearImages/ClearImagesTotals_2011_Jan-Dec.png)
+12](png/ClearImagesTotals_2016_Jan-Dec.png) ![Map of 2011 Entire Image,
+Window Length 12](png/ClearImagesTotals_2011_Jan-Dec.png)
 
 ### Entire Image, Window Length 4
 
@@ -556,9 +544,8 @@ entire image, we see earlier years have upto 25% pixels are not
 cloud-free (e.g. 2013), although again 2016 is quite clear.
 
 ![Map of 2016 Entire Image, Window Length
-4](Data/ClearImages/ClearImagesTotals_2016_Jan-Apr.png) ![Map of 2013
-Entire Image, Window Length
-4](Data/ClearImages/ClearImagesTotals_2013_Jan-Apr.png)
+4](png/ClearImagesTotals_2016_Jan-Apr.png) ![Map of 2013 Entire Image,
+Window Length 4](png/ClearImagesTotals_2013_Jan-Apr.png)
 
 ### Study Area, Window Length 12
 
@@ -608,7 +595,7 @@ this is generally more cloudy in early year, but not so bad from 2014
 onwards.
 
 ![Map of 2010 Entire Image, Window Length
-12](Data/ClearImages/ClearImagesTotals_2010_Jan-Dec.png)
+12](png/ClearImagesTotals_2010_Jan-Dec.png)
 
 ### Study Area, Window Length 4
 
