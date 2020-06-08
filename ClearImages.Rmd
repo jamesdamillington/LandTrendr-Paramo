@@ -71,6 +71,7 @@ sd_b <- mask(sd, buf)
 
 plot(buf_r)
 plot(sd_b)
+print(freq(sd_b))
 ```
 
 We can check the number of cells in the masked raster (compared to the original image0
@@ -344,7 +345,7 @@ dat %>%
 
 ```{r}
 
-#plot count0 (point size) by window length (y) and StartMonth (x)  (shape  by year)
+#plot count0 (point size) by window length (y) and StartMonth (x) 
 
 dat %>%
   filter(Year < 2012) %>%
@@ -372,8 +373,8 @@ So, let's focus here on WindowLengths of 12 and 4
 ```{r message=F}
 #load data
 path <- "Data/ClearImages/" #path to data directory
-dat_Jan_1018 <- read_csv(paste0(path,"ClearImages_ImageSummary_2010-2018_Jan-Jan.csv"))
-dat_Jan_1018_mask <- read_csv(paste0(path,"ClearImages_MaskSummary_2010-2018_Jan-Jan.csv"))
+dat_Jan_1020 <- read_csv(paste0(path,"ClearImages_ImageSummary_2010-2020_Jan-Jan.csv"))
+dat_Jan_1020_mask <- read_csv(paste0(path,"ClearImages_MaskSummary_2010-2020_Jan-Jan.csv"))
 
 ```
 
@@ -384,8 +385,9 @@ total_cells <- ncell(buf_r)
 
 countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
 
-dat_Jan_1018 %>%
+dat_Jan_1020 %>%
   filter(WindowLen == 12) %>%
+  filter(Year < 2020) %>%    #we do not have entire year for 2020
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
@@ -398,8 +400,9 @@ dat_Jan_1018 %>%
   ggtitle("Entire Image, Window Length 12")  
 
 
-dat_Jan_1018 %>%
+dat_Jan_1020 %>%
   filter(WindowLen == 12) %>%
+  filter(Year < 2020) %>%    #we do not have entire year for 2020
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
@@ -427,7 +430,7 @@ total_cells <- ncell(buf_r)
 
 countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
 
-dat_Jan_1018 %>%
+dat_Jan_1020 %>%
   filter(WindowLen == 4) %>%
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
@@ -441,7 +444,7 @@ dat_Jan_1018 %>%
   ggtitle("Entire Image, Window Length 4")  
 
 
-dat_Jan_1018 %>%
+dat_Jan_1020 %>%
   filter(WindowLen == 4) %>%
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
@@ -469,11 +472,12 @@ total_cells <- cellStats(buf_r, sum)
 
 countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
 
-dat_Jan_1018_mask %>%
+dat_Jan_1020_mask %>%
   filter(WindowLen == 12) %>%
+  filter(Year < 2020) %>%    #we do not have entire year for 2020
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
-  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask summary didn't work properly in early version (number is cells in study area minus other classes)
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
   dplyr::select(c(Year,starts_with("Window") | ends_with("prop"))) %>%
   pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>%
@@ -484,11 +488,12 @@ dat_Jan_1018_mask %>%
   ggtitle("Study Area, Window Length 12")  
 
 
-dat_Jan_1018_mask %>%
+dat_Jan_1020_mask %>%
   filter(WindowLen == 12) %>%
+  filter(Year < 2020) %>%    #we do not have entire year for 2020
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
-    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask summary didn't work properly in early version (number is cells in study area minus other classes)
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
   dplyr::select(c(Year,Count0prop,starts_with("Window"))) %>% 
   pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>% 
@@ -512,11 +517,11 @@ total_cells <- cellStats(buf_r, sum)
 
 countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
 
-dat_Jan_1018_mask %>%
+dat_Jan_1020_mask %>%
   filter(WindowLen == 4) %>%
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
-  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask summary didn't work properly in early version (number is cells in study area minus other classes)
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
   dplyr::select(c(Year,starts_with("Window") | ends_with("prop"))) %>%
   pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>%
@@ -527,11 +532,11 @@ dat_Jan_1018_mask %>%
   ggtitle("Study Area, Window Length 4")  
 
 
-dat_Jan_1018_mask %>%
+dat_Jan_1020_mask %>%
   filter(WindowLen == 4) %>%
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
-    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask summary didn't work properly in early version (number is cells in study area minus other classes)
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
   dplyr::select(c(Year,Count0prop,starts_with("Window"))) %>% 
   pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>% 
@@ -546,7 +551,7 @@ dat_Jan_1018_mask %>%
 
 It's a similar issue when we look at 4 month window for the study area, but 2013 is particularly bad with more than half of pixels having no cloud-free image. 
 
-## Concluding Thoughts
+### Thoughts 2020-06-07
 
 - Entire year gives more cloud-free pixels 
 - Study area with Jan-Apr windows will lose a lot of data for years prior to 2014
@@ -556,3 +561,19 @@ It's a similar issue when we look at 4 month window for the study area, but 2013
 Next step in analysis is to identify proportion of pixels in the study area with >1 consecutive years with no cloud-free image? i.e. Pixels with one year missing here-or-there could be included in LandTrendR analyses, but pixels with multi-years of missing data should be ommited from the analysis?
 
 What other analyses?
+
+
+## Pixel-by-Pixel analysis
+
+- Read .tif files for each year/window
+- Extract cellIDs for all pixels with count == 0 in a given year
+- First, count number of years with count == 0
+  - plot histogram of these counts
+  - plot map of these counts
+- Second, for cellIDs with count > 1 identify cells with 2 consecutive years missing (and which years)
+  - do same for count >2 for 3 consecutive years missing
+  - etc. for max count
+- Third (possibly) for higher counts, identify cells with multiple 2+ consecutive years missing
+
+
+
