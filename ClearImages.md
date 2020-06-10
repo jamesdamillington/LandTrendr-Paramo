@@ -1,27 +1,21 @@
 LandTrendr-Paramo Clear Image Analysis
 ================
 James Millington
-2020-06-07
+2020-06-10
 
-  - [Clear Images Analysis](#clear-images-analysis)
-      - [Rationale](#rationale)
-      - [Data](#data)
-          - [Visualise Examples of the
-            Data](#visualise-examples-of-the-data)
-          - [Create Data Summary](#create-data-summary)
-          - [Initial Summary
-            Visualization](#initial-summary-visualization)
-      - [Multi-Year January
-        Visualisation](#multi-year-january-visualisation)
-          - [Entire Image, Window Length
-            12](#entire-image-window-length-12)
-          - [Entire Image, Window Length
-            4](#entire-image-window-length-4)
-          - [Study Area, Window Length 12](#study-area-window-length-12)
-          - [Study Area, Window Length 4](#study-area-window-length-4)
-      - [Concluding Thoughts](#concluding-thoughts)
-
-# Clear Images Analysis
+  - [Rationale](#rationale)
+  - [Data](#data)
+      - [Visualise Examples of the
+        Data](#visualise-examples-of-the-data)
+      - [Create Data Summary](#create-data-summary)
+      - [Initial Summary Visualization](#initial-summary-visualization)
+  - [Multi-Year January
+    Visualisation](#multi-year-january-visualisation)
+      - [Thoughts 2020-06-07](#thoughts-2020-06-07)
+  - [Pixel-by-Pixel analysis](#pixel-by-pixel-analysis)
+      - [Annual Cloud Counts](#annual-cloud-counts)
+      - [Sequences of Counts](#sequences-of-counts)
+      - [Thoughts 2020-06-10](#thoughts-2020-06-10)
 
 ## Rationale
 
@@ -132,6 +126,21 @@ plot(sd_b)
 ```
 
 ![](ClearImages_files/figure-gfm/unnamed-chunk-3-2.png)<!-- -->
+
+``` r
+print(freq(sd_b))
+```
+
+    ##       value    count
+    ##  [1,]     0  2561591
+    ##  [2,]     1  1842221
+    ##  [3,]     2   954852
+    ##  [4,]     3   312556
+    ##  [5,]     4    45079
+    ##  [6,]     5     3499
+    ##  [7,]     6       68
+    ##  [8,]     7       11
+    ##  [9,]    NA 48747443
 
 We can check the number of cells in the masked raster (compared to the
 original image0
@@ -411,7 +420,7 @@ dat %>%
 ![](ClearImages_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ``` r
-#plot count0 (point size) by window length (y) and StartMonth (x)  (shape  by year)
+#plot count0 (point size) by window length (y) and StartMonth (x) 
 
 dat %>%
   filter(Year < 2012) %>%
@@ -445,19 +454,20 @@ So, let’s focus here on WindowLengths of 12 and 4
 ``` r
 #load data
 path <- "Data/ClearImages/" #path to data directory
-dat_Jan_1018 <- read_csv(paste0(path,"ClearImages_ImageSummary_2010-2018_Jan-Jan.csv"))
-dat_Jan_1018_mask <- read_csv(paste0(path,"ClearImages_MaskSummary_2010-2018_Jan-Jan.csv"))
+dat_Jan_1020 <- read_csv(paste0(path,"ClearImages_ImageSummary_2010-2020_Jan-Jan.csv"))
+dat_Jan_1020_mask <- read_csv(paste0(path,"ClearImages_MaskSummary_2010-2020_Jan-Jan.csv"))
 ```
 
-### Entire Image, Window Length 12
+**Entire Image, Window Length 12**
 
 ``` r
 total_cells <- ncell(buf_r)
 
 countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
 
-dat_Jan_1018 %>%
+dat_Jan_1020 %>%
   filter(WindowLen == 12) %>%
+  filter(Year < 2020) %>%    #we do not have entire year for 2020
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
@@ -473,8 +483,9 @@ dat_Jan_1018 %>%
 ![](ClearImages_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ``` r
-dat_Jan_1018 %>%
+dat_Jan_1020 %>%
   filter(WindowLen == 12) %>%
+  filter(Year < 2020) %>%    #we do not have entire year for 2020
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
@@ -498,14 +509,14 @@ image.
 12](png/ClearImagesTotals_2016_Jan-Dec.png) ![Map of 2011 Entire Image,
 Window Length 12](png/ClearImagesTotals_2011_Jan-Dec.png)
 
-### Entire Image, Window Length 4
+**Entire Image, Window Length 4**
 
 ``` r
 total_cells <- ncell(buf_r)
 
 countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
 
-dat_Jan_1018 %>%
+dat_Jan_1020 %>%
   filter(WindowLen == 4) %>%
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
@@ -522,7 +533,7 @@ dat_Jan_1018 %>%
 ![](ClearImages_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 ``` r
-dat_Jan_1018 %>%
+dat_Jan_1020 %>%
   filter(WindowLen == 4) %>%
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
@@ -547,18 +558,19 @@ cloud-free (e.g. 2013), although again 2016 is quite clear.
 4](png/ClearImagesTotals_2016_Jan-Apr.png) ![Map of 2013 Entire Image,
 Window Length 4](png/ClearImagesTotals_2013_Jan-Apr.png)
 
-### Study Area, Window Length 12
+**Study Area, Window Length 12**
 
 ``` r
 total_cells <- cellStats(buf_r, sum)
 
 countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
 
-dat_Jan_1018_mask %>%
+dat_Jan_1020_mask %>%
   filter(WindowLen == 12) %>%
+  filter(Year < 2020) %>%    #we do not have entire year for 2020
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
-  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask summary didn't work properly in early version (number is cells in study area minus other classes)
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
   dplyr::select(c(Year,starts_with("Window") | ends_with("prop"))) %>%
   pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>%
@@ -572,11 +584,12 @@ dat_Jan_1018_mask %>%
 ![](ClearImages_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 ``` r
-dat_Jan_1018_mask %>%
+dat_Jan_1020_mask %>%
   filter(WindowLen == 12) %>%
+  filter(Year < 2020) %>%    #we do not have entire year for 2020
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
-    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask summary didn't work properly in early version (number is cells in study area minus other classes)
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
   dplyr::select(c(Year,Count0prop,starts_with("Window"))) %>% 
   pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>% 
@@ -597,18 +610,18 @@ onwards.
 ![Map of 2010 Entire Image, Window Length
 12](png/ClearImagesTotals_2010_Jan-Dec.png)
 
-### Study Area, Window Length 4
+**Study Area, Window Length 4**
 
 ``` r
 total_cells <- cellStats(buf_r, sum)
 
 countprop <- function(num) { num/total_cells } #function to calc prop count e.g. https://stackoverflow.com/a/49759987
 
-dat_Jan_1018_mask %>%
+dat_Jan_1020_mask %>%
   filter(WindowLen == 4) %>%
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
-  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+  mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask summary didn't work properly in early version (number is cells in study area minus other classes)
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
   dplyr::select(c(Year,starts_with("Window") | ends_with("prop"))) %>%
   pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>%
@@ -622,11 +635,11 @@ dat_Jan_1018_mask %>%
 ![](ClearImages_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 ``` r
-dat_Jan_1018_mask %>%
+dat_Jan_1020_mask %>%
   filter(WindowLen == 4) %>%
   mutate(across(matches("Year"),as.factor)) %>%
   mutate(across(matches("WindowLen"),as.factor)) %>%
-    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask didn't work properly (number is cells in study area minus other classes)
+    mutate(Count6p = 5719877 - (Count0 + Count1 + Count2 + Count3 + Count4 + Count5)) %>%   #fix count6p cells (mask summary didn't work properly in early version (number is cells in study area minus other classes)
   mutate(across(starts_with("Count"), countprop, .names="{col}prop")) %>%  #create proportion columns
   dplyr::select(c(Year,Count0prop,starts_with("Window"))) %>% 
   pivot_longer(cols=ends_with("prop"),names_to="Count",values_to="prop") %>% 
@@ -644,7 +657,7 @@ It’s a similar issue when we look at 4 month window for the study area,
 but 2013 is particularly bad with more than half of pixels having no
 cloud-free image.
 
-## Concluding Thoughts
+### Thoughts 2020-06-07
 
   - Entire year gives more cloud-free pixels
   - Study area with Jan-Apr windows will lose a lot of data for years
@@ -661,3 +674,480 @@ analyses, but pixels with multi-years of missing data should be ommited
 from the analysis?
 
 What other analyses?
+
+## Pixel-by-Pixel analysis
+
+### Annual Cloud Counts
+
+First, lets do some relatively simple counts of the number of years for
+which pixels are (non)cloud-free. We can plot maps and histograms and
+generate frequency tables.
+
+Some functions that will be useful:
+
+``` r
+#function to sum number of years with no cloud free image (given a window of months)
+#output is  raster  of counts
+annualCloudCount <- function(yrs, mons, pixrcl, studyras){
+
+  yrstack <- stack()  
+  
+  for(i in yrs){
+    
+    print(paste0("Year: ", i))
+  
+    iras <- raster(paste0(path,"ClearImagesTotals_",i,"_",mons,".tif"))  #read annual tif files
+    
+    iras <- mask(iras,studyras) #mask to study area
+    
+    rcras <- reclassify(iras, pixrcl)  #reclassify (0 is cloud-free, 1 is not clear)
+    
+    yrstack <- stack(yrstack, rcras)  #add to stack
+  }
+  
+  missing <- sum(yrstack)
+
+  return(missing)
+}
+
+#function to take output raster from annualCloudCount and create a summary tibble
+aCC_summary <- function(ras){
+  
+  counts <- freq(ras, useNA='no')
+  
+  freqs <- as_tibble(counts)
+  freqs <- freqs %>%
+    mutate(cumcount = cumsum(count)) %>%
+    mutate(prop = round(count / sum(count),3)) %>%
+    mutate(cumprop = round(cumcount / sum(count),3))
+  
+  return(freqs)
+}
+
+setRasterTmp <- function(raster_tmp_dir){
+  ##MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+  dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+  rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+  ##
+}
+
+delRasterTmp <- function(raster_tmp_dir){
+  ## remove the tmp dir
+  unlink(raster_tmp_dir, recursive = T, force = T)
+}
+
+
+createBinPixrcl <- function(limit, lower1){
+  
+  if(lower1){
+    rcl0 <- c(-Inf,limit,1)  #>from, <=to, becomes
+    rcl1 <- c(limit,Inf,0)  
+  } else {
+    rcl0 <- c(-Inf,limit,0)  #>from, <=to, becomes
+    rcl1 <- c(limit,Inf,1)  
+  }
+  
+  pixrcl <- rbind(rcl0,rcl1)
+  
+  return(pixrcl)
+}
+```
+
+**Four Month Window**
+
+Only run the next code chunk once (to create the .tif)
+
+``` r
+Years <- seq(2010,2020,1)
+Months <- "Jan-Apr"
+
+cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+
+setRasterTmp("raster_temp")
+JanApr_1020 <- annualCloudCount(Years, Months, cloudrcl0, buf_r)
+writeRaster(JanApr_1020, filename=paste0(path,"annualCloudCount_2010-2020_Jan-Apr.tif"),datatype="INT2S",overwrite=T)
+delRasterTmp("raster_temp")
+```
+
+Now plot and generate frequency table
+
+``` r
+JanApr_1020 <- raster(x=paste0(path,"annualCloudCount_2010-2020_Jan-Apr.tif"))
+JanApr_1020_sum <- aCC_summary(JanApr_1020)
+
+plot(JanApr_1020)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+
+This map shows the number of years each pixel has missing data. We see
+greatest values (greens) in east and south. Some cells have no clear
+pixels across the entire 10 year period.
+
+``` r
+print(JanApr_1020_sum)
+```
+
+    ## # A tibble: 12 x 5
+    ##    value   count cumcount  prop cumprop
+    ##    <dbl>   <dbl>    <dbl> <dbl>   <dbl>
+    ##  1     0 2025161  2025161 0.354   0.354
+    ##  2     1 1446358  3471519 0.253   0.607
+    ##  3     2 1050048  4521567 0.184   0.791
+    ##  4     3  478046  4999613 0.084   0.874
+    ##  5     4  273362  5272975 0.048   0.922
+    ##  6     5  188992  5461967 0.033   0.955
+    ##  7     6  107177  5569144 0.019   0.974
+    ##  8     7   75731  5644875 0.013   0.987
+    ##  9     8   45206  5690081 0.008   0.995
+    ## 10     9   23166  5713247 0.004   0.999
+    ## 11    10    5360  5718607 0.001   1    
+    ## 12    11    1270  5719877 0       1
+
+From the table we can 87.4% of the study area has pixels with 3 or fewer
+missing years (and 92.2% with 4 or fewer).
+
+We likely need to discard the 7.8% of pixels with \>4 missing years?
+
+Let’s quickly plot a map of location of pixels with \>4 missing years
+
+``` r
+cloudrcl4 <- createBinPixrcl(limit=4, lower1=F)  #sets original <=4 value to 1 and everything >4 to 0.
+
+missing_bin <- reclassify(JanApr_1020, cloudrcl4) 
+
+plot(missing_bin)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+
+Now it seems the main issue is in south, but still with some area in the
+east.
+
+**Full year**
+
+Now let’s do the same analyses but using the entire year window.
+
+``` r
+Years <- seq(2010,2019,1)
+Months <- "Jan-Dec"
+
+cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+
+setRasterTmp("raster_temp")
+JanDec_1019 <- annualCloudCount(Years, Months, cloudrcl0, buf_r)
+```
+
+    ## [1] "Year: 2010"
+    ## [1] "Year: 2011"
+    ## [1] "Year: 2012"
+    ## [1] "Year: 2013"
+    ## [1] "Year: 2014"
+    ## [1] "Year: 2015"
+    ## [1] "Year: 2016"
+    ## [1] "Year: 2017"
+    ## [1] "Year: 2018"
+    ## [1] "Year: 2019"
+
+``` r
+writeRaster(JanDec_1019, filename=paste0(path,"annualCloudCount_2010-2019_Jan-Dec.tif"),datatype="INT2S",overwrite=T)
+delRasterTmp("raster_temp")
+```
+
+``` r
+JanDec_1019 <- raster(x=paste0(path,"annualCloudCount_2010-2019_Jan-Dec.tif"))
+JanDec_1019_sum <- aCC_summary(JanDec_1019)
+
+plot(JanDec_1019)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+
+Now we see a maximum of 8 missing years, again in the south of the study
+area.
+
+``` r
+print(JanDec_1019_sum)
+```
+
+    ## # A tibble: 10 x 5
+    ##    value   count cumcount  prop cumprop
+    ##    <dbl>   <dbl>    <dbl> <dbl>   <dbl>
+    ##  1     0 3809083  3809083 0.666   0.666
+    ##  2     1 1180622  4989705 0.206   0.872
+    ##  3     2  357796  5347501 0.063   0.935
+    ##  4     3  176587  5524088 0.031   0.966
+    ##  5     4   98519  5622607 0.017   0.983
+    ##  6     5   54768  5677375 0.01    0.993
+    ##  7     6   27620  5704995 0.005   0.997
+    ##  8     7   12251  5717246 0.002   1    
+    ##  9     8    2382  5719628 0       1    
+    ## 10     9     249  5719877 0       1
+
+And we see higher counts/proportions for years with \<=3 cloudy years
+(96.6% vs 87.4% using four-month window) and \<=4 cloudy years (98.3% vs
+92.2% using four-month window)
+
+Let’s do another quick plot a map of location of pixels with \>4 missing
+years
+
+``` r
+cloudrcl4 <- createBinPixrcl(limit=4, lower1=F)  #sets original <=4 value to 1 and everything >4 to 0.
+
+missing_bin <- reclassify(JanDec_1019, cloudrcl4) 
+
+plot(missing_bin)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+
+Once again we can see that the main issue is in the south of the study
+area, but now with many fewer issues in east.
+
+### Sequences of Counts
+
+The analysis above was couning the number of years with missing data,
+regardless of which years during the 10 year study period were missing.
+So let’s consider the number of pixels with sequences of consecutive
+years of missing data.
+
+First create binary .tifs per year (and months windows); 1 will indicate
+no cloud free data (i.e. missing data), 0 indicates cloud free in the
+window.
+
+``` r
+#function to read, reclass, mask, write Raster
+rrmwRas <- function(yr, mons, pixrcl, studyras, dpath){
+  
+  fpath <- paste0(dpath,"ClearImagesTotals_",yr,"_",mons,".tif")
+  
+  ras1 <- raster(fpath)  #read annual tif files
+  ras1 <- reclassify(ras1, pixrcl)  #reclassify 
+  ras1 <- mask(ras1,studyras) #mask to study area
+  
+  png(filename=paste0(path,"CloudImagesBinary_",yr,"_",mons,".png"))
+  plot(ras1, main=paste0(yr," ",mons))
+  dev.off()
+  
+  writeRaster(ras1, filename=paste0(path,"CloudImagesBinary_",yr,"_",mons,".tif"),datatype="INT2S",overwrite=T)
+
+  #plot(ras1)
+  return(ras1)
+}
+
+yrs <- seq(2010,2020,1)
+Months <- "Jan-Apr"
+
+#TEST THIS NEW FUNCTION
+cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+
+for(yr in yrs){
+  rrmwRas(yr, Months, cloudrcl0, buf_r, path)
+}
+```
+
+Now use the .tifs creates to count the number of consecutive years with
+no cloud-free data.
+
+``` r
+#function to add data for this sequence to the summary data tibble 
+appendSeqData <- function(cDt, start, end, len, count){
+
+  #append data to tibble
+  cDt <- cDt %>% add_row(tibble_row(
+  SeqStart = start,         
+  SeqEnd = end,  
+  SeqLen = len,   
+  Count0 = count
+  ))
+  
+  #return tibble (overwrite)
+  return(cDt)
+}
+
+  
+#function to produce counts of pixels with no cloud-free images in sequences 
+#requires binary cloud/no cloud .tifs to exist (e.g. from rrmwRas function)
+seqCloudCount <- function(yrs, mons, seq_lens){
+
+  #structure for output summary data
+  seq_summary <- tibble(
+  SeqStart = numeric(),   #year this seq startes
+  SeqEnd = numeric(),     #year in which the seq ends
+  SeqLen = numeric(),     #number of years in this seq
+  Count0 = numeric()      #count of pixels with no cloud-free images in this seq
+  )
+
+  #loop on sequence length
+  for(seq_len in seq_lens){
+    
+    print(paste0("Seq length: ", seq_len))
+    for(i in seq_along(yrs)){
+      
+      yrstack <- stack() #reset the stack for this year-seq_len combo
+      if(i+(seq_len-1) <= length(yrs)) #if this year is not beyond the maximum year we want to check (or have data for)
+      {
+        print(paste0("Year: ", yrs[i]))
+         
+        for(j in i:(i+seq_len-1)){
+          
+          print(yrs[j])
+          yrstack <- stack(yrstack, paste0(path,"CloudImagesBinary_",yrs[j],"_",mons,".tif")) #add this year's binary raster to the stack
+        }
+        
+        missing <- sum(yrstack) #sum stack
+        counts = freq(missing, value=seq_len)  #value of seq_len indicates cloud in all years of this sequence
+        
+        #append data to the data tibble
+        seq_summary <- appendSeqData(cDt=seq_summary,start=yrs[i], end=yrs[j], len=seq_len, count=counts)
+  
+        #write image file
+        png(filename=paste0(path,"seqCloudCount_",yrs[i],"-",yrs[j],"_",mons,".png"))
+        plot(missing, main=paste0(yrs[i],"-",yrs[j]," ",mons))
+        dev.off()
+  
+        if(yrs[i+(seq_len-1)] == tail(yrs,1)) break   #if this is the final year we can check given the sequence length, break this year loop
+      } else print("seq_len longer than remaining yrs")  #error message for if above (implies seq_len > length(yrs)) 
+    }
+  }
+  
+  return(seq_summary)  #return the data tibble
+}
+
+setRasterTmp("raster_temp")
+seq234_1019_JanDec <- seqCloudCount(yrs=seq(2010,2019,1), mons="Jan-Dec", seq_len=seq(2,4,1))
+seq234_1020_JanApr <- seqCloudCount(yrs=seq(2010,2020,1), mons="Jan-Apr", seq_len=seq(2,4,1))
+delRasterTmp("raster_temp")
+
+write_csv(seq234_1019_JanDec, paste0(path,"seq234_1019_JanDec.csv"))
+write_csv(seq234_1020_JanApr, paste0(path,"seq234_1020_JanApr.csv"))
+```
+
+``` r
+seq234_1019_JanDec <- read_csv(paste0(path,"seq234_1019_JanDec.csv"))
+print(seq234_1019_JanDec)
+```
+
+    ## # A tibble: 24 x 4
+    ##    SeqStart SeqEnd SeqLen Count0
+    ##       <dbl>  <dbl>  <dbl>  <dbl>
+    ##  1     2010   2011      2 471176
+    ##  2     2011   2012      2 174806
+    ##  3     2012   2013      2  81305
+    ##  4     2013   2014      2   6618
+    ##  5     2014   2015      2   6018
+    ##  6     2015   2016      2   2603
+    ##  7     2016   2017      2   2320
+    ##  8     2017   2018      2  67761
+    ##  9     2018   2019      2  30759
+    ## 10     2010   2012      3 141758
+    ## # … with 14 more rows
+
+``` r
+maskNcell <- cellStats(buf_r, sum)
+
+seq234_1019_JanDec %>%
+  mutate(Prop0 = Count0 / maskNcell) %>%
+  mutate(across(starts_with("Seq"),as.factor)) %>%
+  ggplot(aes(x=SeqStart, y=Prop0)) +
+  geom_bar(stat="identity") +
+  scale_y_continuous(name="Study Area Proportion", limits=c(0,0.18)) +
+  ggtitle("StudyArea, 2010-2019, Jan-Dec, By sequence length") +
+  scale_x_discrete(name ="Sequence Start Year", 
+                    breaks=c("2010","2012","2014","2016","2018")) +
+  #geom_text(aes(label=round(Prop0,3),x=SeqStart,y=Prop0), position=position_dodge(width=0.8), vjust=-0.3) +
+  facet_grid(.~SeqLen)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+
+Using the entire year we can see that 2010 has a big impact on the
+proportion of pixels with sequences of \>=2 missing years. Year 2011 and
+2012 also have an effect but to much lesser extent.
+
+Compare maps of the locations of these pixels with sequences of missing
+data for 2010 vs 2012 vs 2016 (for example; darker green indicates
+pixels with 3 or more missing years starting from 2010): ![Map of
+missing pixels for sequences starting
+2010](png/seqCloudCount_2010-2013_Jan-Dec.png)
+
+![Map of missing pixels for sequences starting
+2012](png/seqCloudCount_2012-2015_Jan-Dec.png)
+
+![Map of missing pixels for sequences starting
+2016](png/seqCloudCount_2016-2019_Jan-Dec.png)
+
+Now let’s look at the four-month window, Jan-Apr
+
+``` r
+seq234_1020_JanApr <- read_csv(paste0(path,"seq234_1020_JanApr.csv"))
+print(seq234_1020_JanApr)
+```
+
+    ## # A tibble: 27 x 4
+    ##    SeqStart SeqEnd SeqLen Count0
+    ##       <dbl>  <dbl>  <dbl>  <dbl>
+    ##  1     2010   2011      2 697529
+    ##  2     2011   2012      2 516305
+    ##  3     2012   2013      2 961837
+    ##  4     2013   2014      2 241608
+    ##  5     2014   2015      2  47155
+    ##  6     2015   2016      2   7973
+    ##  7     2016   2017      2   9013
+    ##  8     2017   2018      2 144952
+    ##  9     2018   2019      2 148447
+    ## 10     2019   2020      2  34516
+    ## # … with 17 more rows
+
+``` r
+maskNcell <- cellStats(buf_r, sum)
+
+seq234_1020_JanApr %>%
+  mutate(Prop0 = Count0 / maskNcell) %>%
+  mutate(across(starts_with("Seq"),as.factor)) %>%
+  ggplot(aes(x=SeqStart, y=Prop0)) +
+  geom_bar(stat="identity") +
+  scale_y_continuous(name="Study Area Proportion", limits=c(0,0.18)) +
+  ggtitle("StudyArea, 2010-2020, Jan-Apr, By sequence length") +
+  scale_x_discrete(name ="Sequence Start Year", 
+                    breaks=c("2010","2012","2014","2016","2018", "2020")) +
+  #geom_text(aes(label=round(Prop0,3),x=SeqStart,y=Prop0), position=position_dodge(width=0.8), vjust=-0.3) +
+  facet_grid(.~SeqLen)
+```
+
+![](ClearImages_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
+
+We see a similar pattern to the all-year window, but with greater
+numbers of pixels and a more prolonged effect into 2012.
+
+Examining the maps again: ![Map of missing pixels for sequences starting
+2010 (four months)](png/seqCloudCount_2010-2013_Jan-Apr.png)
+
+![Map of missing pixels for sequences starting 2012 (four
+months)](png/seqCloudCount_2012-2015_Jan-Apr.png)
+
+![Map of missing pixels for sequences starting 2016 (four
+months)](png/seqCloudCount_2016-2019_Jan-Apr.png)
+
+### Thoughts 2020-06-10
+
+There is further analysis that can be done, but maybe we can start to
+make some decisions:
+
+  - Which window do we use (all-year or four-month)? Or shall we compare
+    LandTrendR results for each?
+  - Which pixels do we drop from all analyses? Those with missing
+    sequences of \>=3 years? Or even \>= 2?
+      - If \>=3 years for all-year window we would lose \~2.5% of pixels
+        if 2010 included (or \~1% if 2010 dropped). For four-month
+        window it would be \~9% if all years used, or down to \~3% if
+        2012 onwards used.
+      - If \>= 2 years then we lose more pixels. Still \<10% for the
+        all-years window (and nearer 3% if 2010 droppped). For the
+        four-month window, we could lose \~17% of pixels, unless we drop
+        2010-2012.  
+  - But also, we likely want to mask any pixels that have \>=3 (or is it
+    \>=2) years missing even if not in a consecutive sequence?
+
+Once we have discussed I can work on code to formally identify the
+unwanted pixels (currently we have only a visual indicator).

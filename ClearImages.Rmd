@@ -1,13 +1,11 @@
 ---
 title: "LandTrendr-Paramo Clear Image Analysis"
 author: "James Millington"
-date: "2020-06-07"
+date: "2020-06-10"
 output: 
   github_document:
     toc: true
 ---
- 
-# Clear Images Analysis
 
 ## Rationale
 Our Paramo study region is characterised by high cloud cover. LandTrendR requires that we specify a window of time during a year to analyse images for change detection. Previous papers have recommended the window should correspond with the growing season. However, our study area is in the tropics with no clearly defined growing season. Furthermore, with high levels of cloud cover we may not be able to limit ourselves to the most physically-appropriate window from the perspective ofchange detection.   
@@ -378,7 +376,7 @@ dat_Jan_1020_mask <- read_csv(paste0(path,"ClearImages_MaskSummary_2010-2020_Jan
 
 ```
 
-### Entire Image, Window Length 12
+**Entire Image, Window Length 12**
 ```{r}
 
 total_cells <- ncell(buf_r)
@@ -423,7 +421,7 @@ So, in 2016 we have a full-year window with almost 100% cloud-free images, but i
 ![Map of 2011 Entire Image, Window Length 12](png/ClearImagesTotals_2011_Jan-Dec.png)
 
 
-### Entire Image, Window Length 4
+**Entire Image, Window Length 4**
 ```{r}
 
 total_cells <- ncell(buf_r)
@@ -465,7 +463,7 @@ When we look at a window length of 4 months (starting in Jan) for the entire ima
 ![Map of 2016 Entire Image, Window Length 4](png/ClearImagesTotals_2016_Jan-Apr.png)
 ![Map of 2013 Entire Image, Window Length 4](png/ClearImagesTotals_2013_Jan-Apr.png)
 
-### Study Area, Window Length 12
+**Study Area, Window Length 12**
 ```{r}
 
 total_cells <- cellStats(buf_r, sum)
@@ -510,7 +508,7 @@ Considering the study area only (for a 12 month window), we find that this is ge
 
 ![Map of 2010 Entire Image, Window Length 12](png/ClearImagesTotals_2010_Jan-Dec.png)
 
-### Study Area, Window Length 4
+**Study Area, Window Length 4**
 ```{r}
 
 total_cells <- cellStats(buf_r, sum)
@@ -639,7 +637,7 @@ createBinPixrcl <- function(limit, lower1){
 
 ```
 
-*Four Month Window*
+**Four Month Window**
 
 Only run the next code chunk once (to create the .tif)
 ```{r eval=F}
@@ -647,11 +645,6 @@ Only run the next code chunk once (to create the .tif)
 Years <- seq(2010,2020,1)
 Months <- "Jan-Apr"
 
-#rcl0 <- c(0,0,1)  #in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
-#rcl1 <- c(1,Inf,0)  
-#cloudrcl <- rbind(rcl0,rcl1)
-
-#TEST THIS NEW FUNCTION
 cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
 
 setRasterTmp("raster_temp")
@@ -665,25 +658,24 @@ Now plot and generate frequency table
 ```{r}
 
 JanApr_1020 <- raster(x=paste0(path,"annualCloudCount_2010-2020_Jan-Apr.tif"))
-JanApr_1010_sum <- aCC_summary(JanApr_1020)
+JanApr_1020_sum <- aCC_summary(JanApr_1020)
 
 plot(JanApr_1020)
-hist(JanApr_1020)
-print(JanApr_1010_sum)
-
 ```
-So 92.7% of the study area has pixels with 3 or fewer missing years (and 97.8 with 4 or fewer). 
+
+This map shows the number of years each pixel has missing data. We see greatest values (greens) in east and south. Some cells have no clear pixels across the entire 10 year period.
+
+```{r}
+print(JanApr_1020_sum)
+```
+
+From the table we can 87.4% of the study area has pixels with 3 or fewer missing years (and 92.2% with 4 or fewer). 
  
-We likely need to discard the 2.2% of pixes with >4 missing years?
+We likely need to discard the 7.8% of pixels with >4 missing years? 
  
 Let's quickly plot a map of location of pixels with >4 missing years
 ```{r}
- 
-#rcl0 <- c(0,4,0)  #in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
-#rcl1 <- c(4,Inf,1)  
-#pixrcl <- rbind(rcl0,rcl1)
- 
-#TEST THIS NEW FUNCTION
+
 cloudrcl4 <- createBinPixrcl(limit=4, lower1=F)  #sets original <=4 value to 1 and everything >4 to 0.
 
 missing_bin <- reclassify(JanApr_1020, cloudrcl4) 
@@ -691,21 +683,17 @@ missing_bin <- reclassify(JanApr_1020, cloudrcl4)
 plot(missing_bin)
  
 ```
- 
- 
-*Full year*
 
-Only run the next code chunk once (to create the .tif) 
-```{r eva=F}
+Now it seems the main issue is in south, but still with some area in the east.  
+ 
+**Full year**
+
+Now let's do the same analyses but using the entire year window. 
+```{r}
  
 Years <- seq(2010,2019,1)
 Months <- "Jan-Dec"
 
-#rcl0 <- c(0,0,1)  #in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
-#rcl1 <- c(1,Inf,0)  
-#cloudrcl <- rbind(rcl0,rcl1)
-
-#TEST THIS NEW FUNCTION
 cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
 
 setRasterTmp("raster_temp")
@@ -716,27 +704,23 @@ delRasterTmp("raster_temp")
 ```
 
 ```{r}
-
 JanDec_1019 <- raster(x=paste0(path,"annualCloudCount_2010-2019_Jan-Dec.tif"))
 JanDec_1019_sum <- aCC_summary(JanDec_1019)
 
 plot(JanDec_1019)
-hist(JanDec_1019)
-print(JanDec_1019_sum)
+```
 
+Now we see a maximum of 8 missing years, again in the south of the study area. 
+
+```{r}
+print(JanDec_1019_sum)
 ```
  
-So now we see slightly higher counts/proportions for years with <=3 cloudy years (97.1% vs 92.7% using four-month window) and <=4 cloudy years (99.0% vs 97.8% using four-month window)
-
+And we see higher counts/proportions for years with <=3 cloudy years (96.6% vs 87.4% using four-month window) and <=4 cloudy years (98.3% vs 92.2% using four-month window)
 
 Let's do another quick plot a map of location of pixels with >4 missing years
 ```{r}
- 
-#rcl0 <- c(0,4,0)  #in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
-#rcl1 <- c(4,Inf,1)  
-#pixrcl <- rbind(rcl0,rcl1)
 
-#TEST THIS NEW FUNCTION
 cloudrcl4 <- createBinPixrcl(limit=4, lower1=F)  #sets original <=4 value to 1 and everything >4 to 0.
 
 missing_bin <- reclassify(JanDec_1019, cloudrcl4) 
@@ -745,18 +729,16 @@ plot(missing_bin)
  
 ``` 
  
- We can see that the main issue is in the south of the study area, with a few other spots dotted to the north. 
+Once again we can see that the main issue is in the south of the study area, but now with many fewer issues in east. 
  
- ## Sequences of Counts
+### Sequences of Counts
  
-Loop through pairs of years.
-Reclass 0, 1
-Sum
-Count cells with sum == 2, add to data
+The analysis above was couning the number of years with missing data, regardless of which years during the 10 year study period were missing. So let's consider the number of pixels with sequences of consecutive years of missing data. 
 
-```{r}
-#function to read, reclass, mask Raster
-rrmRas <- function(yr, mons, pixrcl, studyras, dpath){
+First create binary .tifs per year (and months windows); 1 will indicate no cloud free data (i.e. missing data), 0 indicates cloud free in the window. 
+```{r eval=F}
+#function to read, reclass, mask, write Raster
+rrmwRas <- function(yr, mons, pixrcl, studyras, dpath){
   
   fpath <- paste0(dpath,"ClearImagesTotals_",yr,"_",mons,".tif")
   
@@ -764,9 +746,30 @@ rrmRas <- function(yr, mons, pixrcl, studyras, dpath){
   ras1 <- reclassify(ras1, pixrcl)  #reclassify 
   ras1 <- mask(ras1,studyras) #mask to study area
   
+  png(filename=paste0(path,"CloudImagesBinary_",yr,"_",mons,".png"))
+  plot(ras1, main=paste0(yr," ",mons))
+  dev.off()
+  
+  writeRaster(ras1, filename=paste0(path,"CloudImagesBinary_",yr,"_",mons,".tif"),datatype="INT2S",overwrite=T)
+
+  #plot(ras1)
   return(ras1)
 }
 
+yrs <- seq(2010,2020,1)
+Months <- "Jan-Apr"
+
+#TEST THIS NEW FUNCTION
+cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+
+for(yr in yrs){
+  rrmwRas(yr, Months, cloudrcl0, buf_r, path)
+}
+
+```
+
+Now use the .tifs creates to count the number of consecutive years with no cloud-free data.  
+```{r eval=F}
 #function to add data for this sequence to the summary data tibble 
 appendSeqData <- function(cDt, start, end, len, count){
 
@@ -782,66 +785,132 @@ appendSeqData <- function(cDt, start, end, len, count){
   return(cDt)
 }
 
-
   
-#function to produce counts of pixels with no cloud-free images in sequences
-#TEST AND DEBUG HERE!!
-seqCloudCount <- function(yrs, mons, pixrcl, studyras, seq_len, seqSummary, datapath){
+#function to produce counts of pixels with no cloud-free images in sequences 
+#requires binary cloud/no cloud .tifs to exist (e.g. from rrmwRas function)
+seqCloudCount <- function(yrs, mons, seq_lens){
 
-  yrstack <- stack() 
-  seq_summary <- seqSummary
-
-  for(i in seq_along(yrs)){
-    
-    if(i+(seq_len-1) <= length(yrs))
-    {
-      print(paste0("Year: ", yrs[i]))
-       
-      for(j in i:(i+seq_len-1)){
-        
-        print(yrs[j])
-        yrstack <- stack(yrstack, rrmRas(yrs[j], mons, pixrcl, studyras, datapath))
-      }
-      
-      missing <- sum(yrstack) #sum stack
-      counts = freq(missing, value=seq_len)  #value of seq_len mean pixel is 1 in all rasters
-      
-      seq_summary <- appendSeqData(cDt=seq_summary,start=yrs[i], end=yrs[j], len=seq_len, count=counts)
-  
-      if(yrs[i+(seq_len-1)] == tail(yrs,1)) break
-    } else print("seq_len longer than remaining yrs")
-  }
-  
-  return(seq_summary)
-}
-
-```
-
-```{r}
-
-#structure for output summary data
-seqSummary <- tibble(
+  #structure for output summary data
+  seq_summary <- tibble(
   SeqStart = numeric(),   #year this seq startes
   SeqEnd = numeric(),     #year in which the seq ends
   SeqLen = numeric(),     #number of years in this seq
   Count0 = numeric()      #count of pixels with no cloud-free images in this seq
-)
+  )
 
-seq_len = 2
-yrs <- seq(2010,2012,1)
-Months <- "Jan-Dec"
+  #loop on sequence length
+  for(seq_len in seq_lens){
+    
+    print(paste0("Seq length: ", seq_len))
+    for(i in seq_along(yrs)){
+      
+      yrstack <- stack() #reset the stack for this year-seq_len combo
+      if(i+(seq_len-1) <= length(yrs)) #if this year is not beyond the maximum year we want to check (or have data for)
+      {
+        print(paste0("Year: ", yrs[i]))
+         
+        for(j in i:(i+seq_len-1)){
+          
+          print(yrs[j])
+          yrstack <- stack(yrstack, paste0(path,"CloudImagesBinary_",yrs[j],"_",mons,".tif")) #add this year's binary raster to the stack
+        }
+        
+        missing <- sum(yrstack) #sum stack
+        counts = freq(missing, value=seq_len)  #value of seq_len indicates cloud in all years of this sequence
+        
+        #append data to the data tibble
+        seq_summary <- appendSeqData(cDt=seq_summary,start=yrs[i], end=yrs[j], len=seq_len, count=counts)
+  
+        #write image file
+        png(filename=paste0(path,"seqCloudCount_",yrs[i],"-",yrs[j],"_",mons,".png"))
+        plot(missing, main=paste0(yrs[i],"-",yrs[j]," ",mons))
+        dev.off()
+  
+        if(yrs[i+(seq_len-1)] == tail(yrs,1)) break   #if this is the final year we can check given the sequence length, break this year loop
+      } else print("seq_len longer than remaining yrs")  #error message for if above (implies seq_len > length(yrs)) 
+    }
+  }
+  
+  return(seq_summary)  #return the data tibble
+}
 
-#TEST THIS NEW FUNCTION
-cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+setRasterTmp("raster_temp")
+seq234_1019_JanDec <- seqCloudCount(yrs=seq(2010,2019,1), mons="Jan-Dec", seq_len=seq(2,4,1))
+seq234_1020_JanApr <- seqCloudCount(yrs=seq(2010,2020,1), mons="Jan-Apr", seq_len=seq(2,4,1))
+delRasterTmp("raster_temp")
 
-sS_l2_1014_JanDec <- seqSummary
-
-sS_l2_1014_JanDec <- seqCloudCount(yrs, Months, cloudrcl0, buf_r, seq_len, sS_l2_1014_JanDec, path)
+write_csv(seq234_1019_JanDec, paste0(path,"seq234_1019_JanDec.csv"))
+write_csv(seq234_1020_JanApr, paste0(path,"seq234_1020_JanApr.csv"))
 
 ```
-  
- 
-- Second, for cellIDs with count > 1 identify cells with 2 consecutive years missing (and which years)
-  - do same for count >2 for 3 consecutive years missing
-  - etc. for max count
-- Third (possibly) for higher counts, identify cells with multiple 2+ consecutive years missing
+
+```{r message=F}
+seq234_1019_JanDec <- read_csv(paste0(path,"seq234_1019_JanDec.csv"))
+print(seq234_1019_JanDec)
+
+maskNcell <- cellStats(buf_r, sum)
+
+seq234_1019_JanDec %>%
+  mutate(Prop0 = Count0 / maskNcell) %>%
+  mutate(across(starts_with("Seq"),as.factor)) %>%
+  ggplot(aes(x=SeqStart, y=Prop0)) +
+  geom_bar(stat="identity") +
+  scale_y_continuous(name="Study Area Proportion", limits=c(0,0.18)) +
+  ggtitle("StudyArea, 2010-2019, Jan-Dec, By sequence length") +
+  scale_x_discrete(name ="Sequence Start Year", 
+                    breaks=c("2010","2012","2014","2016","2018")) +
+  #geom_text(aes(label=round(Prop0,3),x=SeqStart,y=Prop0), position=position_dodge(width=0.8), vjust=-0.3) +
+  facet_grid(.~SeqLen)
+
+```
+
+Using the entire year we can see that 2010 has a big impact on the proportion of pixels with sequences of >=2 missing years. Year 2011 and 2012 also have an effect but to much lesser extent. 
+
+Compare maps of the locations of these pixels with sequences of missing data for 2010 vs 2012 vs 2016 (for example; darker green indicates pixels with 3 or more missing years starting from 2010):
+![Map of missing pixels for sequences starting 2010](png/seqCloudCount_2010-2013_Jan-Dec.png)
+
+![Map of missing pixels for sequences starting 2012](png/seqCloudCount_2012-2015_Jan-Dec.png)
+
+![Map of missing pixels for sequences starting 2016](png/seqCloudCount_2016-2019_Jan-Dec.png)
+
+Now let's look at the four-month window, Jan-Apr
+```{r message=F}
+seq234_1020_JanApr <- read_csv(paste0(path,"seq234_1020_JanApr.csv"))
+print(seq234_1020_JanApr)
+
+maskNcell <- cellStats(buf_r, sum)
+
+seq234_1020_JanApr %>%
+  mutate(Prop0 = Count0 / maskNcell) %>%
+  mutate(across(starts_with("Seq"),as.factor)) %>%
+  ggplot(aes(x=SeqStart, y=Prop0)) +
+  geom_bar(stat="identity") +
+  scale_y_continuous(name="Study Area Proportion", limits=c(0,0.18)) +
+  ggtitle("StudyArea, 2010-2020, Jan-Apr, By sequence length") +
+  scale_x_discrete(name ="Sequence Start Year", 
+                    breaks=c("2010","2012","2014","2016","2018", "2020")) +
+  #geom_text(aes(label=round(Prop0,3),x=SeqStart,y=Prop0), position=position_dodge(width=0.8), vjust=-0.3) +
+  facet_grid(.~SeqLen)
+
+```
+
+We see a similar pattern to the all-year window, but with greater numbers of pixels and a more prolonged effect into 2012. 
+
+Examining the maps again:
+![Map of missing pixels for sequences starting 2010 (four months)](png/seqCloudCount_2010-2013_Jan-Apr.png)
+
+![Map of missing pixels for sequences starting 2012 (four months)](png/seqCloudCount_2012-2015_Jan-Apr.png)
+
+![Map of missing pixels for sequences starting 2016 (four months)](png/seqCloudCount_2016-2019_Jan-Apr.png)
+
+### Thoughts 2020-06-10
+
+There is further analysis that can be done, but maybe we can start to make some decisions:
+
+- Which window do we use (all-year or four-month)? Or shall we compare LandTrendR results for each?
+- Which pixels do we drop from all analyses? Those with missing sequences of >=3 years? Or even >= 2? 
+  - If >=3 years for all-year window we would lose ~2.5% of pixels if 2010 included (or ~1% if 2010 dropped). For four-month window it would be ~9% if all years used, or down to ~3% if 2012 onwards used. 
+  - If >= 2 years then we lose more pixels. Still <10% for the all-years window (and nearer 3% if 2010 droppped). For the four-month window, we could lose ~17% of pixels, unless we drop 2010-2012.   
+- But also, we likely want to mask any pixels that have >=3 (or is it >=2) years missing even if not in a consecutive sequence?  
+
+Once we have discussed I can work on code to formally identify the unwanted pixels (currently we have only a visual indicator).   

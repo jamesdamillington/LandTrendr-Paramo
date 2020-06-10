@@ -48,8 +48,8 @@ appendClearData <- function(cDt, yr, ws, wl, counts, lf){
     Count3 = threes,
     Count4 = fours,
     Count5 = fives,
-    Count6p = sixplus),
-    Max = lf-1)
+    Count6p = sixplus),  #ERROR??  WHY iS THERE A ) ON THIS LINE?
+    Max = lf-1)    
   
   #return tibble (overwrite)
   return(cDt)
