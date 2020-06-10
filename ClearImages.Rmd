@@ -565,15 +565,283 @@ What other analyses?
 
 ## Pixel-by-Pixel analysis
 
-- Read .tif files for each year/window
-- Extract cellIDs for all pixels with count == 0 in a given year
-- First, count number of years with count == 0
-  - plot histogram of these counts
-  - plot map of these counts
+### Annual Cloud Counts
+
+First, lets do some relatively simple counts of the number of years for which pixels are (non)cloud-free. We can plot maps and histograms and generate frequency tables. 
+
+Some functions that will be useful:
+```{r}
+#function to sum number of years with no cloud free image (given a window of months)
+#output is  raster  of counts
+annualCloudCount <- function(yrs, mons, pixrcl, studyras){
+
+  yrstack <- stack()  
+  
+  for(i in yrs){
+    
+    print(paste0("Year: ", i))
+  
+    iras <- raster(paste0(path,"ClearImagesTotals_",i,"_",mons,".tif"))  #read annual tif files
+    
+    iras <- mask(iras,studyras) #mask to study area
+    
+    rcras <- reclassify(iras, pixrcl)  #reclassify (0 is cloud-free, 1 is not clear)
+    
+    yrstack <- stack(yrstack, rcras)  #add to stack
+  }
+  
+  missing <- sum(yrstack)
+
+  return(missing)
+}
+
+#function to take output raster from annualCloudCount and create a summary tibble
+aCC_summary <- function(ras){
+  
+  counts <- freq(ras, useNA='no')
+  
+  freqs <- as_tibble(counts)
+  freqs <- freqs %>%
+    mutate(cumcount = cumsum(count)) %>%
+    mutate(prop = round(count / sum(count),3)) %>%
+    mutate(cumprop = round(cumcount / sum(count),3))
+  
+  return(freqs)
+}
+
+setRasterTmp <- function(raster_tmp_dir){
+  ##MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+  dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+  rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+  ##
+}
+
+delRasterTmp <- function(raster_tmp_dir){
+  ## remove the tmp dir
+  unlink(raster_tmp_dir, recursive = T, force = T)
+}
+
+
+createBinPixrcl <- function(limit, lower1){
+  
+  if(lower1){
+    rcl0 <- c(-Inf,limit,1)  #>from, <=to, becomes
+    rcl1 <- c(limit,Inf,0)  
+  } else {
+    rcl0 <- c(-Inf,limit,0)  #>from, <=to, becomes
+    rcl1 <- c(limit,Inf,1)  
+  }
+  
+  pixrcl <- rbind(rcl0,rcl1)
+  
+  return(pixrcl)
+}
+
+```
+
+*Four Month Window*
+
+Only run the next code chunk once (to create the .tif)
+```{r eval=F}
+
+Years <- seq(2010,2020,1)
+Months <- "Jan-Apr"
+
+#rcl0 <- c(0,0,1)  #in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+#rcl1 <- c(1,Inf,0)  
+#cloudrcl <- rbind(rcl0,rcl1)
+
+#TEST THIS NEW FUNCTION
+cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+
+setRasterTmp("raster_temp")
+JanApr_1020 <- annualCloudCount(Years, Months, cloudrcl0, buf_r)
+writeRaster(JanApr_1020, filename=paste0(path,"annualCloudCount_2010-2020_Jan-Apr.tif"),datatype="INT2S",overwrite=T)
+delRasterTmp("raster_temp")
+
+```
+
+Now plot and generate frequency table
+```{r}
+
+JanApr_1020 <- raster(x=paste0(path,"annualCloudCount_2010-2020_Jan-Apr.tif"))
+JanApr_1010_sum <- aCC_summary(JanApr_1020)
+
+plot(JanApr_1020)
+hist(JanApr_1020)
+print(JanApr_1010_sum)
+
+```
+So 92.7% of the study area has pixels with 3 or fewer missing years (and 97.8 with 4 or fewer). 
+ 
+We likely need to discard the 2.2% of pixes with >4 missing years?
+ 
+Let's quickly plot a map of location of pixels with >4 missing years
+```{r}
+ 
+#rcl0 <- c(0,4,0)  #in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+#rcl1 <- c(4,Inf,1)  
+#pixrcl <- rbind(rcl0,rcl1)
+ 
+#TEST THIS NEW FUNCTION
+cloudrcl4 <- createBinPixrcl(limit=4, lower1=F)  #sets original <=4 value to 1 and everything >4 to 0.
+
+missing_bin <- reclassify(JanApr_1020, cloudrcl4) 
+
+plot(missing_bin)
+ 
+```
+ 
+ 
+*Full year*
+
+Only run the next code chunk once (to create the .tif) 
+```{r eva=F}
+ 
+Years <- seq(2010,2019,1)
+Months <- "Jan-Dec"
+
+#rcl0 <- c(0,0,1)  #in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+#rcl1 <- c(1,Inf,0)  
+#cloudrcl <- rbind(rcl0,rcl1)
+
+#TEST THIS NEW FUNCTION
+cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+
+setRasterTmp("raster_temp")
+JanDec_1019 <- annualCloudCount(Years, Months, cloudrcl0, buf_r)
+writeRaster(JanDec_1019, filename=paste0(path,"annualCloudCount_2010-2019_Jan-Dec.tif"),datatype="INT2S",overwrite=T)
+delRasterTmp("raster_temp")
+
+```
+
+```{r}
+
+JanDec_1019 <- raster(x=paste0(path,"annualCloudCount_2010-2019_Jan-Dec.tif"))
+JanDec_1019_sum <- aCC_summary(JanDec_1019)
+
+plot(JanDec_1019)
+hist(JanDec_1019)
+print(JanDec_1019_sum)
+
+```
+ 
+So now we see slightly higher counts/proportions for years with <=3 cloudy years (97.1% vs 92.7% using four-month window) and <=4 cloudy years (99.0% vs 97.8% using four-month window)
+
+
+Let's do another quick plot a map of location of pixels with >4 missing years
+```{r}
+ 
+#rcl0 <- c(0,4,0)  #in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+#rcl1 <- c(4,Inf,1)  
+#pixrcl <- rbind(rcl0,rcl1)
+
+#TEST THIS NEW FUNCTION
+cloudrcl4 <- createBinPixrcl(limit=4, lower1=F)  #sets original <=4 value to 1 and everything >4 to 0.
+
+missing_bin <- reclassify(JanDec_1019, cloudrcl4) 
+
+plot(missing_bin)
+ 
+``` 
+ 
+ We can see that the main issue is in the south of the study area, with a few other spots dotted to the north. 
+ 
+ ## Sequences of Counts
+ 
+Loop through pairs of years.
+Reclass 0, 1
+Sum
+Count cells with sum == 2, add to data
+
+```{r}
+#function to read, reclass, mask Raster
+rrmRas <- function(yr, mons, pixrcl, studyras, dpath){
+  
+  fpath <- paste0(dpath,"ClearImagesTotals_",yr,"_",mons,".tif")
+  
+  ras1 <- raster(fpath)  #read annual tif files
+  ras1 <- reclassify(ras1, pixrcl)  #reclassify 
+  ras1 <- mask(ras1,studyras) #mask to study area
+  
+  return(ras1)
+}
+
+#function to add data for this sequence to the summary data tibble 
+appendSeqData <- function(cDt, start, end, len, count){
+
+  #append data to tibble
+  cDt <- cDt %>% add_row(tibble_row(
+  SeqStart = start,         
+  SeqEnd = end,  
+  SeqLen = len,   
+  Count0 = count
+  ))
+  
+  #return tibble (overwrite)
+  return(cDt)
+}
+
+
+  
+#function to produce counts of pixels with no cloud-free images in sequences
+#TEST AND DEBUG HERE!!
+seqCloudCount <- function(yrs, mons, pixrcl, studyras, seq_len, seqSummary, datapath){
+
+  yrstack <- stack() 
+  seq_summary <- seqSummary
+
+  for(i in seq_along(yrs)){
+    
+    if(i+(seq_len-1) <= length(yrs))
+    {
+      print(paste0("Year: ", yrs[i]))
+       
+      for(j in i:(i+seq_len-1)){
+        
+        print(yrs[j])
+        yrstack <- stack(yrstack, rrmRas(yrs[j], mons, pixrcl, studyras, datapath))
+      }
+      
+      missing <- sum(yrstack) #sum stack
+      counts = freq(missing, value=seq_len)  #value of seq_len mean pixel is 1 in all rasters
+      
+      seq_summary <- appendSeqData(cDt=seq_summary,start=yrs[i], end=yrs[j], len=seq_len, count=counts)
+  
+      if(yrs[i+(seq_len-1)] == tail(yrs,1)) break
+    } else print("seq_len longer than remaining yrs")
+  }
+  
+  return(seq_summary)
+}
+
+```
+
+```{r}
+
+#structure for output summary data
+seqSummary <- tibble(
+  SeqStart = numeric(),   #year this seq startes
+  SeqEnd = numeric(),     #year in which the seq ends
+  SeqLen = numeric(),     #number of years in this seq
+  Count0 = numeric()      #count of pixels with no cloud-free images in this seq
+)
+
+seq_len = 2
+yrs <- seq(2010,2012,1)
+Months <- "Jan-Dec"
+
+#TEST THIS NEW FUNCTION
+cloudrcl0 <- createBinPixrcl(limit=0, lower1=T) #sets original 0 value to 0 and everything >0 to 1. Do this because in input tif 0 indicates no cloud-free images, so code 1 here as we want to count these 
+
+sS_l2_1014_JanDec <- seqSummary
+
+sS_l2_1014_JanDec <- seqCloudCount(yrs, Months, cloudrcl0, buf_r, seq_len, sS_l2_1014_JanDec, path)
+
+```
+  
+ 
 - Second, for cellIDs with count > 1 identify cells with 2 consecutive years missing (and which years)
   - do same for count >2 for 3 consecutive years missing
   - etc. for max count
 - Third (possibly) for higher counts, identify cells with multiple 2+ consecutive years missing
-
-
-
