@@ -41,7 +41,7 @@ library(raster)
 library(sf)
 
 
-dat1 <- raster("Data/NBRanalysis/LTR_AllYear_1.tif")
+LW1 <- raster("Data/NBRanalysis/LTR_AllYear_1.tif")
 
 GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
 #GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
@@ -60,14 +60,22 @@ buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.sh
 #set crs of shp to same as for raster
 buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
 
-plot(dat1)
+plot(LW1)
 plot(st_geometry(buf), add=T)
 ```
 
 ![](AnalyseNBR_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
 
 ``` r
-names(dat1)
+names(LW1)
 ```
 
     ## [1] "LTR_AllYear_1"
+
+``` r
+SW1 <- raster("Data/NBRanalysis/LTR_JanApr_1.tif")
+plot(SW1)
+plot(st_geometry(buf), add=T)
+```
+
+![](AnalyseNBR_files/figure-gfm/unnamed-chunk-1-2.png)<!-- -->
