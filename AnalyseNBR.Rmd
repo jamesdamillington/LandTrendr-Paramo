@@ -1,7 +1,7 @@
 ---
 title: "LandTrendr-Paramo NBR Analysis"
 author: "James Millington"
-date: "2020-07-22"
+date: "2020-07-28"
 output: 
   github_document:
     toc: true
@@ -10,7 +10,7 @@ output:
 ## Aim and Rationale
 We want to compare/characterise (pixel-by-pixel) pre-disturbance value (within Paramo) for LandTrendR outputs for 144 different parameters sets and for time window used to create the outputs (full year vs 4 months).
 
-We need this because we will want to filter LandTrenR results by some pre-isturbance value at some point, but we don't know what that value is yet.
+We need this because we will want to filter LandTrendR results by some pre-disturbance value at some point, but we don't know what that value is yet.
 
 We will compare pairs of pixels that have a disturbance in both full year and 4-month windows _in the same year_ (but we can also do summary stats [below] for _all_ pixels).
 
@@ -31,25 +31,153 @@ Ultimately we want to examine boxplots (and summary stats) of pre-disturbance va
 library(raster)
 library(sf)
 
+#function to create raster of cellIDs and apply layer names
+cidNames <- function(myStack){
+  cid <- myStack[[1]]
+  cid[] <- seq(1:length(myStack[[1]]))
+  myStack <- stack(myStack,cid)
 
-LW1 <- raster("Data/NBRanalysis/LTR_AllYear_1.tif")
+  names(myStack) <- c("Year", "Magnitude", "Duration", "PreValue", "SpecChg", "DSNR","cellID")
+  return(myStack)
+}
 
-GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
-#GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/"  #windows
+#function to set 0 to NA in raster
+NAize <- function(x) { ifelse(x == 0, NA, x) }
 
-buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
+#crop for testing
+crp <- c(620000, 630000, 570000, 580000)
 
-#set crs of shp to same as for raster
-buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
 
-plot(LW1)
-plot(st_geometry(buf), add=T)
+#read crop (for testing)
+FY1 <- stack("Data/NBRanalysis/LTR_AllYear_1.tif")
+FY1 <- crop(FY1, crp)
 
-names(LW1)
+#cellID, names NAs
+FY1 <- cidNames(FY1)
+FY1 <- calc(FY1,NAize)
+#plot(FY1)
 
-SW1 <- raster("Data/NBRanalysis/LTR_JanApr_1.tif")
-plot(SW1)
-plot(st_geometry(buf), add=T)
+#read crop (for testing)
+TY1 <- stack("Data/NBRanalysis/LTR_JanApr_1.tif")
+TY1 <- crop(TY1, crp)
+
+#cellID, names NAs
+TY1 <- cidNames(TY1)
+TY1 <- calc(TY1,NAize)
+#plot(TY1)
+
+```
+
+
+```{r}
+
+
+library(dplyr)
+
+#stack year layers for full vs third (four month) 
+
+#pairYears <- stack(FY1[["Year"]],TY1[["Year"]])
+#names(pairYears) <- c("Full", "Third")
+#plot(pairYears)
+
+#set true for any pixels that have identical years, otherwise false. 
+equalityChk0 <- function(x,y) { 
+  ifelse(!is.na(x) & y > !is.na(y), 
+         ifelse(x == y, 1, NA),NA)
+}
+pairBin <- overlay(FY1[["Year"]],TY1[["Year"]], fun=equalityChk0)
+pBsum <- cellStats(pairBin, stat="sum") 
+
+#1 if a disurbance is present in both images (per pixel) in ANY year
+disturbancePresent <- function(x,y) { 
+  ifelse(!is.na(x) & y > !is.na(y), 1, NA)
+}
+pairDist <- overlay(FY1[["Year"]],TY1[["Year"]], fun=disturbancePresent)
+dPsum <- cellStats(pairDist, stat="sum") 
+
+
+
+#subset FY1 to cells with identical years
+FY1dat <- FY1[!is.na(pairBin[])]
+
+#convert to tibble
+FY1tib <- as_tibble(FY1dat)
+FY1tib <- mutate(FY1tib, pset=1, subset="FY") 
+
+#subset TY1 to cells with identical years
+TY1dat <- TY1[!is.na(pairBin[])]
+
+#convert to tibble
+TY1tib <- as_tibble(TY1dat)
+TY1tib <- mutate(TY1tib, pset=1, subset="TY") 
+
+#consolidate
+AllDat <- bind_rows(FY1tib, TY1tib)
+
+#set factors
+library(forcats)
+AllDat <- mutate(AllDat, 
+            Year = as_factor(Year), 
+            subset=as_factor(subset),
+            pset=as_factor(pset))
+
+glimpse(AllDat)
+summary(AllDat)
+```
+
+```{r}
+pStack[]
+
+plot(dat)
+plot(pairBin)
+
+dat <- pStack[!is.na(pb[])]
+
+pval <- getValues(pStack, 10)
+
+pval <- getValues(pairBin, 10)
+
+
+FY1m <- mask(FY1[["Magnitude"]], pairBin)
+
+#then mask for other layers
+#then boxplot, hist direct from rasters
+boxplot(FY1m, maxpixels=500000)
+
+#and use cellStats for max, median, min, sd, etc. 
+cellStats(FY1m, stat='mean')
+cellStats(FY1[["Year"]], stat='min')
+cellStats(FY1[["Year"]], stat='max')
+quantile(FY1m)
+
+summary(FY1[["Year"]])
+
+#raster of cell numbers
+rc <- pairBin
+rc[] <- seq(1:length(pairBin))
+
+
+
+ncell(pb)
+dat <- pb[!is.na(pb[])]
+plot(dat)
+
+YearsBin <- stack(pairBin, rc)
+
+dat <- !is.na(YearsBin)
+
+pyval <- getValues(YearsBin, 10) 
+
+
+plot(rc)
 
 
 ```
+
+
+
+
+
+extract pixel id of true values
+
+use pixel id to extract data (write table to file)
