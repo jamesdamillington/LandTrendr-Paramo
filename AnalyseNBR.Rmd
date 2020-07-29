@@ -44,22 +44,38 @@ cidNames <- function(myStack){
 #function to set 0 to NA in raster
 NAize <- function(x) { ifelse(x == 0, NA, x) }
 
-#crop for testing
-crp <- c(620000, 630000, 570000, 580000)
 
+#read mask data 
+GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+buf_r <- raster(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m_mask.tif"))
+buf_r_trim <- trim(buf_r)
+
+dum <- calc(buf_r_trim,NAize)
+
+
+crp <- extent(buf_r_trim)
+
+#crop for testing
+#crp <- c(620000, 630000, 570000, 580000)
+
+dsubs <- data.frame(a=0,b=NA)
 
 #read crop (for testing)
 FY1 <- stack("Data/NBRanalysis/LTR_AllYear_1.tif")
 FY1 <- crop(FY1, crp)
 
+#writeRaster(FY1, "Data/NBRanalysis/LTR_AllYear_1_crop.tif")
+
 #cellID, names NAs
 FY1 <- cidNames(FY1)
-FY1 <- calc(FY1,NAize)
-#plot(FY1)
+FY1[["Year"]] <- calc(FY1[["Year"]],NAize)
+FY1 <- subs(FY1,y=dsubs, by=1, which=2, subsWithNA=F)
+plot(FY1)
 
 #read crop (for testing)
 TY1 <- stack("Data/NBRanalysis/LTR_JanApr_1.tif")
 TY1 <- crop(TY1, crp)
+writeRaster(TY1, "Data/NBRanalysis/LTR_JanApr_1_crop.tif")
 
 #cellID, names NAs
 TY1 <- cidNames(TY1)
