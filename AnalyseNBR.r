@@ -79,21 +79,23 @@ buf_r_trim <- raster(paste0(GISpath,"GroundTruthingBuffer500m_mask_trim.tif"))
 #plot(buf_r_trim)
 
 
-scenario <- 1
-scenario_list <- seq(from=1,to=2,by=1)
+#scenario <- 1
+scenario_list <- seq(from=1,to=144,by=1)
+#scenario_list <- c(2,127)
 
-for(scenario in scenarios_list){
+for(scenario in scenario_list){
 
-  raster_tmp_dir <- "/home/james/R/raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+  print(scenario)
+  
+  start <- Sys.time()
+  
+  raster_tmp_dir <- "E:/raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
   dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
   rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
 
   data_dir <- paste0(getwd(),"/Data/NBRanalysis/Pset",scenario)  ## define the name of directory to save results
   dir.create(data_dir, showWarnings = F, recursive=T)  ## create the directory
-  
-  
-  start <- Sys.time()
-  
+
   all_stack <- stack(paste0("Data/NBRanalysis/LTR_AllYear_",scenario,".tif"))
   
   #all_stack <- crop(all_stack, buf_extent)
@@ -109,10 +111,9 @@ for(scenario in scenarios_list){
   thr_stack <- stack(paste0("Data/NBRanalysis/LTR_JanApr_",scenario,".tif"))
   thr_stack <- tidyStack(thr_stack, buf_r_trim)
   
-  end <- Sys.time()
-  print(end - start)
+
   
-  plot(all_stack, colNA = "red", main="All")
+  #plot(all_stack, colNA = "red", main="All")
   #plot(thr_stack, colNA = "red", main="Third")
 
 
@@ -137,17 +138,11 @@ for(scenario in scenarios_list){
   #pairDist <- overlay(all_stack[["Year"]],thr_stack[["Year"]], fun=disturbancePresent)
   #dPsum <- cellStats(pairDist, stat="sum") 
   
-  
-  start <- Sys.time()
+
   all_tib <- getPairs(all_stack, pairBin, "All")
-  end <- Sys.time()
-  print(end - start)
-  
-  
-  start <- Sys.time()
+
   thr_tib <- getPairs(thr_stack, pairBin, "Third")
-  end <- Sys.time()
-  print(end - start)
+
   
   #consolidate
   AllDat <- bind_rows(all_tib, thr_tib)
@@ -167,8 +162,6 @@ for(scenario in scenarios_list){
     pivot_longer(cols= where(is.numeric),names_to="Variable", values_to="Value")
   
 
-  start <- Sys.time()
-  
   #Summarise across all groups
   YWP <- quantileMaker(data=AD_long, calcCol=Value, Year, Window, Paramo, Variable)
   write_csv(YWP, path=paste0(data_dir,"/YWP_Summary_Pset",scenario,".csv"))
@@ -198,17 +191,15 @@ for(scenario in scenarios_list){
   write_csv(Y, path=paste0(data_dir,"/Y_Summary_Pset",scenario,".csv"))
   
 
-  end <- Sys.time()
-  print(end - start)
-
 
   #plots
 
   #ltrvar <- "PreValue"  
 
-  start <- Sys.time()
   
-  for(ltrvar in c("PreValue","Duration","Magnitude")){
+  for(ltrvar in c("PreValue","Magnitude")){
+    
+    print(ltrvar)
                
     YP_box <- AD_long %>%
       filter(Variable == ltrvar) %>%
@@ -252,13 +243,15 @@ for(scenario in scenarios_list){
       ggtitle(ltrvar)
     ggsave(paste0(data_dir,"/W_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
   }
-  end <- Sys.time()
-  print(end - start)
+
   
 
-  print("unlink")
+  #print("unlink")
   ## remove the tmp dir
   unlink(raster_tmp_dir, recursive = T, force = T)
+  
+  end <- Sys.time()
+  print(end - start)
 }  
   
   
