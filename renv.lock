@@ -317,13 +317,6 @@
       "Repository": "CRAN",
       "Hash": "780713bd2f53156fae001443dcdbdcd5"
     },
-    "gargle": {
-      "Package": "gargle",
-      "Version": "0.5.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "aaacaf8b0ec3dfe45df9eb6bc040db44"
-    },
     "gdtools": {
       "Package": "gdtools",
       "Version": "0.2.2",
@@ -379,13 +372,6 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "d947d05b3f3afaa3457e3cda9044ee50"
-    },
-    "googledrive": {
-      "Package": "googledrive",
-      "Version": "1.0.1",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "79ba5d18133290a69b7c135dc3dfef1a"
     },
     "gridBase": {
       "Package": "gridBase",
