@@ -46,6 +46,17 @@ getPairs <- function(myStack, filterRaster, myWin){
   dat <- myStack[!is.na(filterRaster[])]
   tib <- as_tibble(dat)
   tib <- mutate(tib, Window=myWin)
+  return(tib)
+}
+
+getPixels <- function(myStack, myWin){
+  
+  print(paste0("getPixels ",myWin))
+  tib <- as_tibble(myStack[])
+  tib <- tib %>%
+    mutate(Window=myWin)%>%
+    filter(Year>2010)
+  return(tib)
 }
 
 
@@ -75,12 +86,13 @@ GISpath <- "Data/GIS/" #linux
 #writeRaster(buf_r_trim, paste0(GISpath, "GroundTruthingBuffer500m_mask_trim.tif"))
 buf_r_trim <- raster(paste0(GISpath,"GroundTruthingBuffer500m_mask_trim.tif"))
 
+pairs <- F
 
 #plot(buf_r_trim)
 
 
 #scenario <- 1
-scenario_list <- seq(from=1,to=144,by=1)
+scenario_list <- seq(from=1,to=2,by=1)
 #scenario_list <- c(2,127)
 
 for(scenario in scenario_list){
@@ -93,6 +105,7 @@ for(scenario in scenario_list){
   dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
   rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
 
+  #data_dir <- paste0(getwd(),"/Data/NBRanalysis/")
   data_dir <- paste0(getwd(),"/Data/NBRanalysis/Pset",scenario)  ## define the name of directory to save results
   dir.create(data_dir, showWarnings = F, recursive=T)  ## create the directory
 
@@ -119,30 +132,39 @@ for(scenario in scenario_list){
 
   #stack year layers for full vs third (four month) 
   
-  #pairYears <- stack(FY1[["Year"]],TY1[["Year"]])
-  #names(pairYears) <- c("Full", "Third")
-  #plot(pairYears)
+  if(pairs){
+    
+    #pairYears <- stack(FY1[["Year"]],TY1[["Year"]])
+    #names(pairYears) <- c("Full", "Third")
+    #plot(pairYears)
+    #set true for any pixels that have identical years, otherwise false. 
+    equalityChk0 <- function(x,y) { 
+      ifelse(x > 2010 & y > 2010, 
+             ifelse(x == y, 1, NA),NA)
+    }
+    pairBin <- overlay(all_stack[["Year"]],thr_stack[["Year"]], fun=equalityChk0)
+    pBsum <- cellStats(pairBin, stat="sum") 
+    
+    #1 if a disurbance is present in both images (per pixel) in ANY year
+    #disturbancePresent <- function(x,y) { 
+    #  ifelse(!is.na(x) & y > !is.na(y), 1, NA)
+    #}
+    #pairDist <- overlay(all_stack[["Year"]],thr_stack[["Year"]], fun=disturbancePresent)
+    #dPsum <- cellStats(pairDist, stat="sum") 
+    
   
-  #set true for any pixels that have identical years, otherwise false. 
-  equalityChk0 <- function(x,y) { 
-    ifelse(x > 2010 & y > 2010, 
-           ifelse(x == y, 1, NA),NA)
+    all_tib <- getPairs(all_stack, pairBin, "All")
+  
+    thr_tib <- getPairs(thr_stack, pairBin, "Third")
   }
-  pairBin <- overlay(all_stack[["Year"]],thr_stack[["Year"]], fun=equalityChk0)
-  pBsum <- cellStats(pairBin, stat="sum") 
-  
-  #1 if a disurbance is present in both images (per pixel) in ANY year
-  #disturbancePresent <- function(x,y) { 
-  #  ifelse(!is.na(x) & y > !is.na(y), 1, NA)
-  #}
-  #pairDist <- overlay(all_stack[["Year"]],thr_stack[["Year"]], fun=disturbancePresent)
-  #dPsum <- cellStats(pairDist, stat="sum") 
-  
 
-  all_tib <- getPairs(all_stack, pairBin, "All")
-
-  thr_tib <- getPairs(thr_stack, pairBin, "Third")
-
+  if(!pairs){
+    
+    all_tib <- getPixels(all_stack, "All")
+    
+    thr_tib <- getPixels(thr_stack, "Third")
+  }
+    
   
   #consolidate
   AllDat <- bind_rows(all_tib, thr_tib)
