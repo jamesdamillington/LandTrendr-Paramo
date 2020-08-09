@@ -5,7 +5,7 @@ library(tibble)
 library(tidyr)
 library(readr)
 
-data_dir <- paste0(getwd(),"/Data/NBRanalysis/AllPixels/")
+data_dir <- paste0(getwd(),"/Data/NBRanalysis/PairedByYear/")
 
 #create empty tibbles to hold all data
 #first, tibble with all common columns
