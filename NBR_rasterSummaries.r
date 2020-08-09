@@ -92,7 +92,7 @@ pairs <- F
 
 
 #scenario <- 1
-scenario_list <- seq(from=1,to=2,by=1)
+scenario_list <- seq(from=1,to=144,by=1)
 #scenario_list <- c(2,127)
 
 for(scenario in scenario_list){
@@ -106,7 +106,7 @@ for(scenario in scenario_list){
   rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
 
   #data_dir <- paste0(getwd(),"/Data/NBRanalysis/")
-  data_dir <- paste0(getwd(),"/Data/NBRanalysis/Pset",scenario)  ## define the name of directory to save results
+  data_dir <- paste0(getwd(),"/Data/NBRanalysis/AllPixels/Pset",scenario)  ## define the name of directory to save results
   dir.create(data_dir, showWarnings = F, recursive=T)  ## create the directory
 
   all_stack <- stack(paste0("Data/NBRanalysis/LTR_AllYear_",scenario,".tif"))
@@ -219,51 +219,137 @@ for(scenario in scenario_list){
   #ltrvar <- "PreValue"  
 
   
-  for(ltrvar in c("PreValue","Magnitude")){
+  for(ltrvar in c("Magnitude","PreValue")){
     
     print(ltrvar)
-               
-    YP_box <- AD_long %>%
-      filter(Variable == ltrvar) %>%
-      ggplot(aes(x=Year, y=Value, colour=Paramo)) +
-      geom_boxplot() +
-      ggtitle(ltrvar)
-    ggsave(paste0(data_dir,"/YP_Boxplot_",ltrvar,"_Pset",scenario,".png"),device="png")
+              
+    # YP_box <- AD_long %>%
+    #   filter(Variable == ltrvar) %>%
+    #   ggplot(aes(x=Year, y=Value, colour=Paramo)) +
+    #   geom_boxplot() +
+    #   ggtitle(ltrvar)
+    # ggsave(paste0(data_dir,"/YP_Boxplot_",ltrvar,"_Pset",scenario,".png"),device="png")
+    # 
+    # rm(YP_box)
     
-    YW_box <- AD_long %>%
-      filter(Variable == ltrvar) %>%
-      ggplot(aes(x=Year, y=Value, colour=Window)) +
-      geom_boxplot() +
-      ggtitle(ltrvar)
-    ggsave(paste0(data_dir,"/YW_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
+    box_dat <- AD_long %>%
+      filter(Variable == ltrvar)
+
+    png(paste0(data_dir,"/YP_Boxplot_",ltrvar,"_Pset",scenario,"_range4.png"))
+    par(mar=c(5.1, 4.1, 4.1, 8.1), xpd=TRUE)
+    boxplot(Value~Year*Paramo, data=box_dat,
+            col=c("lightgreen","darkgreen"),
+            main=ltrvar,
+            xaxt="n", 
+            xlab="Year",
+            frame.plot=TRUE,
+            range=4)
+    axis(1, at=c(1.5,5.5,9.5,13.5),labels=c("2012","2014","2016","2018"))
+    legend("topright", inset=c(-0.3,0), legend=c("Outside","Inside"), fill=c("lightgreen","darkgreen"), title="Paramo")
+    dev.off()
+
     
-    PW_box <- AD_long %>%
-      filter(Variable == ltrvar) %>%
-      ggplot(aes(x=Paramo, y=Value, colour=Window)) +
-      geom_boxplot() +
-      ggtitle(ltrvar)
-    ggsave(paste0(data_dir,"/PW_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
+    # YW_box <- AD_long %>%
+    #   filter(Variable == ltrvar) %>%
+    #   ggplot(aes(x=Year, y=Value, colour=Window)) +
+    #   geom_boxplot() +
+    #   ggtitle(ltrvar)
+    # ggsave(paste0(data_dir,"/YW_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
+    # 
+    # rm(YW_box)
     
-    Y_box <- AD_long %>%
-      filter(Variable == ltrvar) %>%
-      ggplot(aes(x=Year, y=Value)) +
-      geom_boxplot() +
-      ggtitle(ltrvar)
-    ggsave(paste0(data_dir,"/Y_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
-  
-    P_box <- AD_long %>%
-      filter(Variable == ltrvar) %>%
-      ggplot(aes(x=Paramo, y=Value)) +
-      geom_boxplot() +
-      ggtitle(ltrvar)
-    ggsave(paste0(data_dir,"/P_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
+ 
+    png(paste0(data_dir,"/YW_Boxplot_",ltrvar,"_Pset",scenario,"_range4.png"))
+    par(mar=c(5.1, 4.1, 4.1, 8.1), xpd=TRUE)
+    boxplot(Value~Year*Window, data=box_dat,
+            col=c("lightgreen","darkgreen"),
+            main=ltrvar,
+            xaxt="n", 
+            xlab="Year",
+            frame.plot=TRUE,
+            range=4)
+    axis(1, at=c(1.5,5.5,9.5,13.5),labels=c("2012","2014","2016","2018"))
+    legend("topright", inset=c(-0.3,0), legend=c("All","Third"), fill=c("lightgreen","darkgreen"), title="Window")
+    dev.off()
     
-    W_box <- AD_long %>%
-      filter(Variable == ltrvar) %>%
-      ggplot(aes(x=Window, y=Value)) +
-      geom_boxplot() +
-      ggtitle(ltrvar)
-    ggsave(paste0(data_dir,"/W_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
+    # PW_box <- AD_long %>%
+    #   filter(Variable == ltrvar) %>%
+    #   ggplot(aes(x=Paramo, y=Value, colour=Window)) +
+    #   geom_boxplot() +
+    #   ggtitle(ltrvar)
+    # ggsave(paste0(data_dir,"/PW_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
+    # 
+    # rm(PW_box)
+    
+   png(paste0(data_dir,"/PW_Boxplot_",ltrvar,"_Pset",scenario,"_range4.png"))
+    par(mar=c(5.1, 4.1, 4.1, 8.1), xpd=TRUE)
+    boxplot(Value~Paramo*Window, data=box_dat,
+            col=c("lightgreen","darkgreen"),
+            main=ltrvar,
+            xaxt="n", 
+            xlab="Paramo",
+            frame.plot=TRUE,
+            range=4)
+    axis(1, at=c(1.5,3.5),labels=c("Outside","Inside"))
+    legend("topright", inset=c(-0.3,0), legend=c("All","Third"), fill=c("lightgreen","darkgreen"), title="Window")
+    dev.off()
+    
+    
+    # Y_box <- AD_long %>%
+    #   filter(Variable == ltrvar) %>%
+    #   ggplot(aes(x=Year, y=Value)) +
+    #   geom_boxplot() +
+    #   ggtitle(ltrvar)
+    # ggsave(paste0(data_dir,"/Y_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
+    # 
+    # rm(Y_box)
+    
+    png(paste0(data_dir,"/Y_Boxplot_",ltrvar,"_Pset",scenario,"_range4.png"))
+    boxplot(Value~Year, data=box_dat,
+            main=ltrvar,
+            xlab="Year")
+    dev.off()
+    
+    
+     
+    # P_box <- AD_long %>%
+    #   filter(Variable == ltrvar) %>%
+    #   ggplot(aes(x=Paramo, y=Value)) +
+    #   geom_boxplot() +
+    #   ggtitle(ltrvar)
+    # ggsave(paste0(data_dir,"/P_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
+    # 
+    # rm(P_box)
+    
+    png(paste0(data_dir,"/P_Boxplot_",ltrvar,"_Pset",scenario,"_range4.png"))
+    boxplot(Value~Paramo, data=box_dat,
+            main=ltrvar,
+            xaxt="n", 
+            xlab="Paramo",
+            frame.plot=TRUE,
+            range=4)
+    axis(1,at=c(1,2),labels=c("Outside","Inside"))
+    dev.off()
+    
+    # W_box <- AD_long %>%
+    #   filter(Variable == ltrvar) %>%
+    #   ggplot(aes(x=Window, y=Value)) +
+    #   geom_boxplot() +
+    #   ggtitle(ltrvar)
+    # ggsave(paste0(data_dir,"/W_Boxplot_",ltrvar,"_Pset",scenario,".png"), device="png")
+    # 
+    # rm(W_box)
+    
+    png(paste0(data_dir,"/W_Boxplot_",ltrvar,"_Pset",scenario,"_range4.png"))
+    boxplot(Value~Window, data=box_dat,
+            main=ltrvar,
+            xaxt="n", 
+            xlab="Window",
+            frame.plot=TRUE,
+            range=4)
+    axis(1,at=c(1,2),labels=c("All","Third"))
+    dev.off()
+    
   }
 
   
