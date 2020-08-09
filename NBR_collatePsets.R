@@ -5,6 +5,7 @@ library(tibble)
 library(tidyr)
 library(readr)
 
+data_dir <- paste0(getwd(),"/Data/NBRanalysis/AllPixels/")
 
 #create empty tibbles to hold all data
 #first, tibble with all common columns
@@ -68,7 +69,7 @@ YWP_all <- stat_tbl %>%
 
 addData <- function(all, scen, scenID, dd){
   
-  d <- read_csv(paste0(dd,"/",scen,"_Summary_Pset",scenID,".csv"))
+  d <- read_csv(paste0(dd,"Pset",scenID,"/",scen,"_Summary_Pset",scenID,".csv"))
   d <- mutate(d, Pset = scenID)
   all <- bind_rows(all, d)
   
@@ -82,7 +83,7 @@ scenario_list <- seq(from=1,to=144,by=1)
 
 for(scenario in scenario_list){
   
-  data_dir <- paste0(getwd(),"/Data/NBRanalysis/Pset",scenario)  ## define the name of directory to save results
+  ##data_dir <- paste0(getwd(),"/Data/NBRanalysis/AllPixels/Pset",scenario)  ## define the name of directory to save results
   
   Y_all <- addData(Y_all, "Y", scenario, data_dir)
   P_all <- addData(P_all, "P", scenario, data_dir)
@@ -96,12 +97,12 @@ for(scenario in scenario_list){
 
 }
 
-write_csv(Y_all, path=paste0(getwd(),"/Data/NBRanalysis/Y_Summary_all.csv"))
-write_csv(P_all, path=paste0(getwd(),"/Data/NBRanalysis/P_Summary_all.csv"))
-write_csv(W_all, path=paste0(getwd(),"/Data/NBRanalysis/W_Summary_all.csv"))
+write_csv(Y_all, path=paste0(data_dir,"Y_Summary_all.csv"))
+write_csv(P_all, path=paste0(data_dir,"P_Summary_all.csv"))
+write_csv(W_all, path=paste0(data_dir,"W_Summary_all.csv"))
 
-write_csv(YW_all, path=paste0(getwd(),"/Data/NBRanalysis/YW_Summary_all.csv"))
-write_csv(YP_all, path=paste0(getwd(),"/Data/NBRanalysis/YP_Summary_all.csv"))
-write_csv(WP_all, path=paste0(getwd(),"/Data/NBRanalysis/WP_Summary_all.csv"))
+write_csv(YW_all, path=paste0(data_dir,"YW_Summary_all.csv"))
+write_csv(YP_all, path=paste0(data_dir,"YP_Summary_all.csv"))
+write_csv(WP_all, path=paste0(data_dir,"WP_Summary_all.csv"))
 
-write_csv(YWP_all, path=paste0(getwd(),"/Data/NBRanalysis/YWP_Summary_all.csv"))
+write_csv(YWP_all, path=paste0(data_dir,"YWP_Summary_all.csv"))
