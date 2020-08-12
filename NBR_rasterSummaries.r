@@ -119,22 +119,22 @@ pairs <- F    #if pixels, should analysisbe paired between all year and third of
 #plot(buf_r_trim)
 
 
-scenario <- 1
-#scenario_list <- seq(from=1,to=144,by=1)
+#scenario <- 1
+scenario_list <- seq(from=1,to=144,by=1)
 #scenario_list <- c(2,127)
 
-#for(scenario in scenario_list){
+for(scenario in scenario_list){
 
   print(scenario)
   
   start <- Sys.time()
   
-  raster_tmp_dir <- paste0(getwd(),"/raster_tmp")
-  #raster_tmp_dir <- "E:/raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+  #raster_tmp_dir <- paste0(getwd(),"/raster_tmp")
+  raster_tmp_dir <- "E:/raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
   dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
   rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
 
-  data_dir <- paste0(getwd(),"/Data/NBRanalysis/AllPixels/Pset",scenario)  ## define the name of directory to save results
+  #data_dir <- paste0(getwd(),"/Data/NBRanalysis/AllPixels/Pset",scenario)  ## define the name of directory to save results
   #dir.create(data_dir, showWarnings = F, recursive=T)  ## create the directory
 
   all_stack <- stack(paste0("Data/NBRanalysis/LTR_AllYear_",scenario,".tif"))
@@ -391,7 +391,7 @@ scenario <- 1
   
   end <- Sys.time()
   print(end - start)
-#}  
+}  
   
   
 
