@@ -1,0 +1,72 @@
+---
+title: "LandTrendr-Paramo - Global Fire Atlas"
+author: "James Millington"
+date: "2021-07-30"
+output: 
+  github_document:
+    toc: true
+---
+
+
+```{r warning=F, message=F}
+library(raster)
+library(sf)
+
+GFA16 <- st_read("Data/MODIS/Global_Fire_Atlas/Global_fire_atlas_V1_ignitions_2016/Global_fire_atlas_V1_ignitions_2016.shp")
+
+crs(GFA16)
+
+```
+
+Load landsat raster
+```{r}
+dat1 <- raster("Data/ClearImages/ClearJan0.tif")
+```
+
+Create polygon of our max study extent
+```{r}
+bb <- bbox(dat1)
+
+#following from https://gis.stackexchange.com/a/403979
+bb_pol = st_polygon(
+  list(
+    cbind(
+      bb[1,][c(1,2,2,1,1)], 
+      bb[2,][c(1,1,2,2,1)])
+  )
+)
+
+#set projection to original raster (dat1)
+bb_pol = st_sfc(bb_pol, crs="+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
+#reproject to GFA raster
+bb_pol <- st_transform(bb_pol, "+proj=longlat +datum=WGS84 +no_defs")
+```
+
+
+```{r}
+
+GFA16_p <- st_intersection(GFA16, bb_pol)
+plot(GFA16_p)
+
+```
+
+Load paramo boundary shapefile
+```{r results = 'hide', warning=F, message=F}
+GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
+
+#set crs of shp to same as for cci raster
+buf <- st_transform(buf, "+proj=longlat +datum=WGS84 +no_defs")
+```
+
+
+```{r}
+
+plot(st_geometry(GFA16_p),col='black',pch=3)
+plot(st_geometry(buf),border='red',add=T)
+
+```
+
+Next Steps
+- Combined all GFA years?
+- Filter LTR data by size (min 21 ha)?
