@@ -1,0 +1,63 @@
+---
+title: "LandTrendr-Paramo - GABAM"
+author: "James Millington"
+date: "2021-08-03"
+output: 
+  github_document:
+    toc: true
+---
+
+Checking [GABAM](https://vapd.gitlab.io/post/gabam/) data compared to our study area 
+
+
+
+```{r warning=F, message=F}
+library(raster)
+library(sf)
+library(landscapemetrics)
+```
+
+
+```{r}
+
+NAize <- function(x) { ifelse(x == 0, NA, x) }
+gabam <- stack()
+
+years <- 2011:2019
+for(yr in years){
+  
+  r <- raster(paste0('/home/james/wdResearch/LandTrendr-Paramo/Data/GABAM/N10W080_',yr,'.TIF'))
+  r <- crop(r, extent(-74, -72, 5, 7))
+  r <- calc(r, NAize)
+  gabam <- stack(gabam, r)
+  
+}
+names(gabam) <- years
+plot(gabam, col='red')
+
+
+GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
+
+#set crs of shp to same as for cci raster
+buf <- st_transform(buf, "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
+
+```
+
+```{r}
+
+for(yr in years){
+  
+  lyr <- paste0('X',yr)
+  fires <- lsm_p_area(gabam[[lyr]])
+  print(paste0(yr,": ",max(fires['id']), "fires"))
+  
+}
+  
+```
+
+There seem to be very few fires... more cloud issues?
+
+> The availability of adequate good quality observations remains another limiting factor for Landsat-based BA detection, since the temporal gaps caused by relatively lower temporal resolution and cloud contamination can result in omission errors, particularly in tropic regions. 
+
+Long _et al._ (2019) https://doi.org/10.3390/rs11050489
