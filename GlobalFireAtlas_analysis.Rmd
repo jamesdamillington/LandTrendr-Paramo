@@ -11,13 +11,43 @@ output:
 ```{r warning=F, message=F}
 library(raster)
 library(sf)
+library(dplyr)
 
-#i16 <- st_read("Data/MODIS/Global_Fire_Atlas/Global_fire_atlas_V1_ignitions_2016/Global_fire_atlas_V1_ignitions_2016.shp")
-p16  <- st_read("Data/MODIS/Global_Fire_Atlas/Global_fire_atlas_V1_perimeter_2016/Global_fire_atlas_V1_perimeter_2016.shp")
+paramo_2deg_ext <- extent(-74, -72, 5, 7)
 
-#crs(i16)
-crs(p16)
+dem <- raster('/home/james/wdResearch/LandTrendr-Paramo/Data/SRTM/srtm_22_11/srtm_22_11.tif')
+dem <- crop(dem, paramo_2deg_ext)
+
+years <- 2011:2016
+
+for(yr in years){
+  point <- st_read(paste0("Data/MODIS/Global_Fire_Atlas/Global_fire_atlas_V1_ignitions_",yr,"/Global_fire_atlas_V1_ignitions_",yr,".shp"))
+  point <- st_crop(point, paramo_2deg_ext)
+  
+  perim  <- st_read(paste0("Data/MODIS/Global_Fire_Atlas/Global_fire_atlas_V1_perimeter_",yr,"/Global_fire_atlas_V1_perimeter_",yr,".shp"))
+  perim <- st_crop(perim, paramo_2deg_ext)
+  
+  point_dem <- extract(dem, point, sp=TRUE)
+  perim_dem <- extract(dem, perim, fun=min, sp=TRUE)
+  
+  st_write(st_as_sf(point_dem), paste0("Data/MODIS/Global_Fire_Atlas/",yr,"/GFA_ignitions_elev_",yr,".shp"))
+  st_write(st_as_sf(perim_dem), paste0("Data/MODIS/Global_Fire_Atlas/",yr,"/GFA_perimeter_elev_",yr,".shp"))
+}
 ```
+
+```{r}
+y <- 2016
+dta  <- st_read(paste0("Data/MODIS/Global_Fire_Atlas/",y,"/GFA_ignitions_elev_",y,".shp"))
+
+plot(dem)
+plot(dta['s_22_11'], pch=3,color='blue',add=T)
+plot(st_geometry(buf),border='red',add=T)
+
+```
+
+
+
+
 
 Load landsat raster  [change this to use SRTM DEM to decide study area]
 ```{r}
