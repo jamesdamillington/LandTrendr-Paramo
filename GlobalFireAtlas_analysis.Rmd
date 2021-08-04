@@ -12,13 +12,14 @@ output:
 library(raster)
 library(sf)
 
-GFA16 <- st_read("Data/MODIS/Global_Fire_Atlas/Global_fire_atlas_V1_ignitions_2016/Global_fire_atlas_V1_ignitions_2016.shp")
+#i16 <- st_read("Data/MODIS/Global_Fire_Atlas/Global_fire_atlas_V1_ignitions_2016/Global_fire_atlas_V1_ignitions_2016.shp")
+p16  <- st_read("Data/MODIS/Global_Fire_Atlas/Global_fire_atlas_V1_perimeter_2016/Global_fire_atlas_V1_perimeter_2016.shp")
 
-crs(GFA16)
-
+#crs(i16)
+crs(p16)
 ```
 
-Load landsat raster
+Load landsat raster  [change this to use SRTM DEM to decide study area]
 ```{r}
 dat1 <- raster("Data/ClearImages/ClearJan0.tif")
 ```
@@ -42,11 +43,14 @@ bb_pol = st_sfc(bb_pol, crs="+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs +
 bb_pol <- st_transform(bb_pol, "+proj=longlat +datum=WGS84 +no_defs")
 ```
 
-
+Clip points to bounding box
 ```{r}
 
-GFA16_p <- st_intersection(GFA16, bb_pol)
-plot(GFA16_p)
+#i16_p <- st_intersection(i16, bb_pol)
+#plot(i16_p)
+
+p16_p <- st_intersection(p16, bb_pol)
+plot(p16_p)
 
 ```
 
@@ -62,7 +66,7 @@ buf <- st_transform(buf, "+proj=longlat +datum=WGS84 +no_defs")
 
 ```{r}
 
-plot(st_geometry(GFA16_p),col='black',pch=3)
+plot(st_geometry(p16_p),col='black',pch=3)
 plot(st_geometry(buf),border='red',add=T)
 
 ```
@@ -70,3 +74,35 @@ plot(st_geometry(buf),border='red',add=T)
 Next Steps
 - Combined all GFA years?
 - Filter LTR data by size (min 21 ha)?
+
+```{r}
+#function to set 0 to NA in raster
+NAize <- function(x) { ifelse(x == 0, NA, x) }
+
+#function to set 0 to NA in stack
+myStack_NAize <- function(myStack){
+  yr <- calc(myStack[[1]],NAize)
+  myStack <- mask(myStack, yr)
+  return(myStack)
+}
+```
+
+```{r}
+
+stk <- stack('/home/james/wdResearch/LandTrendr-Paramo/Data/NBRanalysis/LTR_JanApr_96.tif')
+stk <- myStack_NAize(stk)
+
+ras <- stk[[1]]
+ras <- projectRaster(ras, crs="+proj=longlat +datum=WGS84 +no_defs")
+crs(ras)
+summary(ras)
+plot(stk)
+```
+
+```{r}
+
+plot(ras)
+plot(st_geometry(p16_p),col='black',pch=3,add=T)
+plot(st_geometry(buf),border='red',add=T)
+
+```
