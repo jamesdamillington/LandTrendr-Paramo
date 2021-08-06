@@ -16,7 +16,8 @@ library(dplyr)
 
 Load paramo boundary shapefile
 ```{r results = 'hide', warning=F, message=F}
-GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+#GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+GISpath <- "E:/OneDrive - King's College London/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #windows
 buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
 
 #set crs of shp to same as for cci raster
@@ -27,12 +28,12 @@ Load LTR dummy raster (for extent and resolution) and set projection)
 ```{r results = 'hide', warning=F, message=F}
 
 ltr_res <- raster("Data/NBRanalysis/LTR_JanApr_95.tif")
-ltr_res <- projectRaster(ltr_res, crs="+proj=longlat +datum=WGS84 +no_defs")
+ltr_res <- projectRaster(ltr_res, crs="+proj=longlat +datum=WGS84 +no_defs", method='ngb')
 ```
 
 Load DEM, set extent and resolution to LTR, mask to >2000m
 ```{r results = 'hide', warning=F, message=F}
-dem <- raster('/home/james/wdResearch/LandTrendr-Paramo/Data/SRTM/srtm_22_11/srtm_22_11.tif')
+dem <- raster('Data/SRTM/srtm_22_11/srtm_22_11.tif')
 dem <- crop(dem, extent(ltr_res))
 dem <-resample(dem, ltr_res)
 
@@ -103,22 +104,29 @@ Load landsat raster  [change this to use SRTM DEM to decide study area]
 ```{r}
 
 #scenario <- 1
-#scenario_list <- seq(from=1,to=144,by=1)
-scenario_list <- c(1,95,96)
+scenario_list <- seq(from=1,to=144,by=1)
+#scenario_list <- c(1,95,96)
 
 for(scenario in scenario_list){
-  
+
   for(grp in c("JanApr","AllYear")){
 
+    raster_tmp_dir <- "E:/raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+    dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+    rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+  
     print(paste0(grp,"_",scenario))
     dat <- stack(paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,".tif"))
     dat <- dat[[1]]
+    dat <- calc(dat, NAize)
     dat <- projectRaster(dat, crs="+proj=longlat +datum=WGS84 +no_defs", method='ngb')
   
     matches <- gfa_max == dat
     ct <- crosstab(matches,gfa_max)
     
     write.csv(ct, paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,".csv"))
+    
+    unlink(raster_tmp_dir, recursive = T, force = T)
   }
 }
 
