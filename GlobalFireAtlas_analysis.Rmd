@@ -12,11 +12,38 @@ output:
 library(raster)
 library(sf)
 library(dplyr)
+```
 
-paramo_2deg_ext <- extent(-74, -72, 5, 7)
+Load paramo boundary shapefile
+```{r results = 'hide', warning=F, message=F}
+GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
 
+#set crs of shp to same as for cci raster
+buf <- st_transform(buf, "+proj=longlat +datum=WGS84 +no_defs")
+```
+
+Load LTR dummy raster (for extent and resolution) and set projection)
+```{r results = 'hide', warning=F, message=F}
+
+ltr_res <- raster("Data/NBRanalysis/LTR_JanApr_95.tif")
+ltr_res <- projectRaster(ltr_res, crs="+proj=longlat +datum=WGS84 +no_defs")
+```
+
+Load DEM, set extent and resolution to LTR, mask to >2000m
+```{r results = 'hide', warning=F, message=F}
 dem <- raster('/home/james/wdResearch/LandTrendr-Paramo/Data/SRTM/srtm_22_11/srtm_22_11.tif')
-dem <- crop(dem, paramo_2deg_ext)
+dem <- crop(dem, extent(ltr_res))
+dem <-resample(dem, ltr_res)
+
+elevize <- function(x) { ifelse(x < 2000, NA, x) }
+dem2000 <- calc(dem, elevize)
+```
+
+Subset global fire atlas shapefiles to records within Paramo 2 degree box (only run once, then use output data below).
+This code adds the (minimum) elevation of the point/polygon from DEM to the output data (can be used to subset by elevation later) 
+```{r eval=F}
+paramo_2deg_ext <- extent(-74, -72, 5, 7)  #this might be better as extent(ltr_res)
 
 years <- 2011:2016
 
@@ -35,24 +62,97 @@ for(yr in years){
 }
 ```
 
-```{r}
-y <- 2016
-dta  <- st_read(paste0("Data/MODIS/Global_Fire_Atlas/",y,"/GFA_ignitions_elev_",y,".shp"))
+Read GFA polygons
+Convert to raster with extent/resolution of LTR
+  - set cell values to year of data (else zero)
 
-plot(dem)
-plot(dta['s_22_11'], pch=3,color='blue',add=T)
-plot(st_geometry(buf),border='red',add=T)
+```{r}
+
+#gfa16 <- st_read(paste0("Data/MODIS/Global_Fire_Atlas/2016/GFA_perimeter_elev_2016.shp"))
+#gfa16 <- rasterize(gfa16, ltr_res, field=2016, background=0)
+
+gfa_stk <- stack()
+
+years <- 2011:2016
+for(yr in years){
+  gfa  <- st_read(paste0("Data/MODIS/Global_Fire_Atlas/",yr,"/GFA_perimeter_elev_",yr,".shp"))
+  gfa_ras <- rasterize(gfa, ltr_res, field=yr, background=0)
+  
+  gfa_stk <- stack(gfa_stk, gfa_ras)
+}
 
 ```
 
 
+Stack rasters produces by max (work with latest fire)
+  - Any cells with value >0 have fire
+  - set 0s to NA
+```{r}
 
+gfa_stk_elev2000 <- mask(gfa_stk, dem2000)
+gfa_max <- overlay(gfa_stk_elev2000, fun=max)
 
+NAize <- function(x) { ifelse(x == 0, NA, x) }
+gfa_max <- calc(gfa_max, NAize)
+```
+
+For cells with MODIS fire, calc proportion of LTR pixels that are also fire:
+[what if all are 100% covered? then need to think about how many of cells _surrounding_ the MODIS fire is 'burned' by LTR]
 
 Load landsat raster  [change this to use SRTM DEM to decide study area]
 ```{r}
-dat1 <- raster("Data/ClearImages/ClearJan0.tif")
+
+#scenario <- 1
+#scenario_list <- seq(from=1,to=144,by=1)
+scenario_list <- c(1,95,96)
+
+for(scenario in scenario_list){
+  
+  for(grp in c("JanApr","AllYear")){
+
+    print(paste0(grp,"_",scenario))
+    dat <- stack(paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,".tif"))
+    dat <- dat[[1]]
+    dat <- projectRaster(dat, crs="+proj=longlat +datum=WGS84 +no_defs", method='ngb')
+  
+    matches <- gfa_max == dat
+    ct <- crosstab(matches,gfa_max)
+    
+    write.csv(ct, paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,".csv"))
+  }
+}
+
 ```
+
+Results are not good. Need to set up code to run all NBR files.... 
+
+Kris suggests checking overlap between MODIS and year+1 for LTR
+
+```{r}
+matches1 <- gfa_max == dat1
+#gfa16 <- calc(gfa16, NAize)
+
+crosstab(matches1,gfa_max)
+```
+
+```{r}
+
+dat1 <- mask(dat1, dem2000)
+
+dat16 <- calc(dat1, NAize)
+
+```
+
+```{r}
+perim  <- st_read(paste0("Data/MODIS/Global_Fire_Atlas/2016/GFA_perimeter_elev_2016.shp"))
+
+plot(dat16, col='red')
+zoom(dat16)
+
+plot(perim, add=T)
+freq(dat16)
+```
+
 
 Create polygon of our max study extent
 ```{r}
@@ -82,15 +182,6 @@ Clip points to bounding box
 p16_p <- st_intersection(p16, bb_pol)
 plot(p16_p)
 
-```
-
-Load paramo boundary shapefile
-```{r results = 'hide', warning=F, message=F}
-GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
-buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
-
-#set crs of shp to same as for cci raster
-buf <- st_transform(buf, "+proj=longlat +datum=WGS84 +no_defs")
 ```
 
 
