@@ -17,9 +17,9 @@ library(dplyr)
 ```{r}
 
 ##MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
-raster_tmp_dir <- "/home/james/r_raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
-dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
-rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+#raster_tmp_dir <- "/home/james/r_raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+#dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+#rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
 
 #remember to delete the temp raster later!  for example
 ## unlink(raster_tmp_dir, recursive = T, force = T)
@@ -27,7 +27,7 @@ rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
 
 Load paramo boundary shapefile
 ```{r results = 'hide', warning=F, message=F}
-GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
+GISpath <- "Data/Fire GIS Files/" 
 buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
 
 #set crs of shp to same as for cci raster
@@ -45,7 +45,7 @@ ltr_res <- raster("Data/NBRanalysis/ltr_res.grd")
 
 Load DEM, set extent and resolution to LTR, mask to >2000m
 ```{r results = 'hide', warning=F, message=F}
-dem <- raster('/home/james/wdResearch/LandTrendr-Paramo/Data/SRTM/srtm_22_11/srtm_22_11.tif')
+dem <- raster('Data/SRTM/srtm_22_11/srtm_22_11.tif')
 dem <- crop(dem, extent(ltr_res))
 dem <-resample(dem, ltr_res)
 
@@ -103,28 +103,21 @@ Stack rasters produced by max (work with latest fire)
 ```{r}
 
 gfa_stk_elev2000 <- mask(gfa_stk, dem2000)
-NAvalue(gfa_stk_elev2000) <- 0
 
-NAize <- function(x) { ifelse(x == 0, NA, x) }
-
-gfa_stk_elev2000 <- calc(gfa_stk_elev2000, NAize)
-
-gfa_max2 <- overlay(gfa_stk_elev2000, fun=max)
+gfa_max <- overlay(gfa_stk_elev2000, fun=max)
 gfa_sum <- overlay(gfa_stk_elev2000, fun=sum)
-gfa_min <- overlay(gfa_stk_elev2000, fun=min)
 
 NAize <- function(x) { ifelse(x == 0, NA, x) }
 gfa_max <- calc(gfa_max, NAize)
 gfa_sum <- calc(gfa_sum, NAize)
-gfa_min <- calc(gfa_min, NAize)
 
 writeRaster(gfa_max, "Data/NBRanalysis/gfa_max.grd")
 writeRaster(gfa_sum, "Data/NBRanalysis/gfa_sum.grd")
-writeRaster(gfa_min, "Data/NBRanalysis/gfa_min.grd")
+```
 
+```{r}
 gfa_max <- raster("Data/NBRanalysis/gfa_max.grd")
 gfa_sum <- raster("Data/NBRanalysis/gfa_sum.grd")
-gfa_min <- raster("Data/NBRanalysis/gfa_min.grd")
 
 ```
 
@@ -162,7 +155,7 @@ Results are not good. Need to set up code to run all NBR files....
 Kris suggests checking overlap between MODIS and year+1 for LTR  [also check overlap with GABAM... and GABAM vs Global Fire Atlas]
 
 ```{r}
-matches1 <- gfa_max == dat1
+matches1 <- gfa_max == dat
 #gfa16 <- calc(gfa16, NAize)
 
 crosstab(matches1,gfa_max)
