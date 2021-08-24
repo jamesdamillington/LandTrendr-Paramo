@@ -14,6 +14,17 @@ library(sf)
 library(dplyr)
 ```
 
+```{r}
+
+##MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+raster_tmp_dir <- "/home/james/r_raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+
+#remember to delete the temp raster later!  for example
+## unlink(raster_tmp_dir, recursive = T, force = T)
+```
+
 Load paramo boundary shapefile
 ```{r results = 'hide', warning=F, message=F}
 GISpath <- "/home/james/OneDrive/Research/Projects/ColombiaBIO/Fire/Fire GIS Files/" #linux
@@ -25,9 +36,11 @@ buf <- st_transform(buf, "+proj=longlat +datum=WGS84 +no_defs")
 
 Load LTR dummy raster (for extent and resolution) and set projection)
 ```{r results = 'hide', warning=F, message=F}
-
-ltr_res <- raster("Data/NBRanalysis/LTR_JanApr_95.tif")
-ltr_res <- projectRaster(ltr_res, crs="+proj=longlat +datum=WGS84 +no_defs")
+#reproject takes a while so do once, write to file, then in future read 
+#ltr_res <- raster("Data/NBRanalysis/LTR_JanApr_95.tif")
+#ltr_res <- projectRaster(ltr_res, crs="+proj=longlat +datum=WGS84 +no_defs")
+#writeRaster(ltr_res, "Data/NBRanalysis/ltr_res.grd")
+ltr_res <- raster("Data/NBRanalysis/ltr_res.grd")
 ```
 
 Load DEM, set extent and resolution to LTR, mask to >2000m
@@ -84,16 +97,35 @@ for(yr in years){
 ```
 
 
-Stack rasters produces by max (work with latest fire)
+Stack rasters produced by max (work with latest fire)
   - Any cells with value >0 have fire
   - set 0s to NA
 ```{r}
 
 gfa_stk_elev2000 <- mask(gfa_stk, dem2000)
-gfa_max <- overlay(gfa_stk_elev2000, fun=max)
+NAvalue(gfa_stk_elev2000) <- 0
+
+NAize <- function(x) { ifelse(x == 0, NA, x) }
+
+gfa_stk_elev2000 <- calc(gfa_stk_elev2000, NAize)
+
+gfa_max2 <- overlay(gfa_stk_elev2000, fun=max)
+gfa_sum <- overlay(gfa_stk_elev2000, fun=sum)
+gfa_min <- overlay(gfa_stk_elev2000, fun=min)
 
 NAize <- function(x) { ifelse(x == 0, NA, x) }
 gfa_max <- calc(gfa_max, NAize)
+gfa_sum <- calc(gfa_sum, NAize)
+gfa_min <- calc(gfa_min, NAize)
+
+writeRaster(gfa_max, "Data/NBRanalysis/gfa_max.grd")
+writeRaster(gfa_sum, "Data/NBRanalysis/gfa_sum.grd")
+writeRaster(gfa_min, "Data/NBRanalysis/gfa_min.grd")
+
+gfa_max <- raster("Data/NBRanalysis/gfa_max.grd")
+gfa_sum <- raster("Data/NBRanalysis/gfa_sum.grd")
+gfa_min <- raster("Data/NBRanalysis/gfa_min.grd")
+
 ```
 
 For cells with MODIS fire, calc proportion of LTR pixels that are also fire:
@@ -102,7 +134,8 @@ For cells with MODIS fire, calc proportion of LTR pixels that are also fire:
 Load landsat raster  [change this to use SRTM DEM to decide study area]
 ```{r}
 
-#scenario <- 1
+scenario <- 1
+grp <- "JanApr"
 #scenario_list <- seq(from=1,to=144,by=1)
 scenario_list <- c(1,95,96)
 
@@ -112,7 +145,7 @@ for(scenario in scenario_list){
 
     print(paste0(grp,"_",scenario))
     dat <- stack(paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,".tif"))
-    dat <- dat[[1]]
+    dat <- dat[[1]]  #layer 1 is year
     dat <- projectRaster(dat, crs="+proj=longlat +datum=WGS84 +no_defs", method='ngb')
   
     matches <- gfa_max == dat
@@ -126,7 +159,7 @@ for(scenario in scenario_list){
 
 Results are not good. Need to set up code to run all NBR files.... 
 
-Kris suggests checking overlap between MODIS and year+1 for LTR
+Kris suggests checking overlap between MODIS and year+1 for LTR  [also check overlap with GABAM... and GABAM vs Global Fire Atlas]
 
 ```{r}
 matches1 <- gfa_max == dat1
