@@ -130,7 +130,7 @@ Load landsat raster  [change this to use SRTM DEM to decide study area]
 scenario <- 1
 grp <- "JanApr"
 #scenario_list <- seq(from=1,to=144,by=1)
-scenario_list <- c(1,95,96)
+scenario_list <- c(1,95)
 
 for(scenario in scenario_list){
   
@@ -142,9 +142,19 @@ for(scenario in scenario_list){
     dat <- projectRaster(dat, crs="+proj=longlat +datum=WGS84 +no_defs", method='ngb')
   
     matches <- gfa_max == dat
-    ct <- crosstab(matches,gfa_max)
+    ct <- crosstab(matches,gfa_max)  #misses are 0s, hits are 1s
+    ct <- ct[,2:6]  #drop 2011 (column 1) to leave 2012:2016
     
-    write.csv(ct, paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,".csv"))
+    #get false alarms [count(dat) - (hits + misses)]
+    hm <- colSums(ct) #hits+misses
+    fdat <- freq(dat) #counts
+    fdat <- fdat[2:6,2] #get counts for 2012:2016
+    
+    fa <- fdat - hm     #false alarms
+    ct <- rbind(ct,fa)  #bind to table
+    row.names(ct) <- c("misses","hits","F-alarms") #set row.names
+    
+    write.csv(ct, paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,"-fa.csv"))
   }
 }
 
@@ -153,6 +163,118 @@ for(scenario in scenario_list){
 Results are not good. Need to set up code to run all NBR files.... 
 
 Kris suggests checking overlap between MODIS and year+1 for LTR  [also check overlap with GABAM... and GABAM vs Global Fire Atlas]
+
+```{r}
+
+#library(tidyverse)
+#scenario <- 1
+#grp <- "JanApr"
+#scenario_list <- c(1,95)
+
+scenario_list <- seq(from=1,to=144,by=1)
+
+dat_tbl <- tibble(
+  year=character(),
+  count=numeric(),
+  pset=numeric(),
+  grp=character()
+)
+m_tbl <- dat_tbl
+h_tbl <- dat_tbl
+fa_tbl <- dat_tbl
+    
+for(scenario in scenario_list){
+  
+  for(grp in c("JanApr","AllYear")){
+    
+    po <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,".csv"), 
+                   col_select=-1, 
+                   col_types=cols(.default="i"))
+
+    misses <- po %>% 
+      slice(1) %>%
+      pivot_longer(cols=everything(), names_to="year",values_to="count") %>%
+      mutate(pset=scenario,grp=grp)
+    m_tbl <- bind_rows(m_tbl, misses)
+    
+    hits <- po %>% 
+      slice(2) %>%
+      pivot_longer(cols=everything(), names_to="year",values_to="count") %>%
+      mutate(pset=scenario,grp=grp)
+    h_tbl <- bind_rows(h_tbl, hits)
+    
+    falarm <- po %>% 
+      slice(3) %>%
+      pivot_longer(cols=everything(), names_to="year",values_to="count") %>%
+      mutate(pset=scenario,grp=grp)
+    fa_tbl <- bind_rows(fa_tbl, falarm)
+    
+  }
+}
+
+write_csv(m_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Misses.csv")
+write_csv(h_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Hits.csv")
+write_csv(fa_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_FalseAlarms.csv")
+
+```
+
+```{r}
+
+plotCounts <- function(.dat){
+
+  maxcount <- .dat %>%
+    group_by(pset, grp) %>%
+    summarise(counts = sum(count)) 
+    
+  maxcount <- ceiling(max(maxcount$counts))
+  
+  #for loop across parameter sets (to split plots for legibility)
+  Pset_filter <- data.frame(rbind(c(0,24),c(24,48),c(48,72),c(72,96),c(96,120),c(120,144)))
+  
+  #loop over pset groups and plot
+  for(row in 1:length(Pset_filter[,1])){
+    
+    lower <- Pset_filter[row,1]
+    upper <- Pset_filter[row,2]
+  
+    plotDat <- .dat %>%
+      filter(pset > lower & pset <= upper) %>%
+      mutate(pset = formatC(pset, width = 3, format = "d", flag = "0")) %>%  #pad with preceeding 0s so that plots margins are identical
+      mutate(pset = factor(pset)) %>%
+      mutate(year = factor(year))
+  
+    p <- ggplot(plotDat, aes(fill=year, y=count, x=grp)) + 
+      geom_bar(position="stack", stat="identity") +
+      facet_grid(.~pset) +
+      ylim(0,maxcount) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+    print(p)
+  }
+}
+
+```
+
+```{r}
+
+
+Hall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Hits.csv"))
+Mall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Misses.csv"))
+Fall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_FalseAlarms.csv"))
+
+pdf("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Hits.pdf", width=10, height=10)
+plotCounts(Hall)
+dev.off()
+
+pdf("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Misses.pdf", width=10, height=10)
+plotCounts(Mall)
+dev.off()
+
+pdf("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Fall.pdf", width=10, height=10)
+plotCounts(Fall)
+dev.off()
+
+```
 
 ```{r}
 matches1 <- gfa_max == dat
