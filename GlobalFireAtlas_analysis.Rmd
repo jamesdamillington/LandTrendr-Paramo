@@ -14,16 +14,6 @@ library(sf)
 library(dplyr)
 ```
 
-```{r}
-
-##MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
-#raster_tmp_dir <- "/home/james/r_raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
-#dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
-#rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
-
-#remember to delete the temp raster later!  for example
-## unlink(raster_tmp_dir, recursive = T, force = T)
-```
 
 Load paramo boundary shapefile
 ```{r results = 'hide', warning=F, message=F}
@@ -31,7 +21,7 @@ GISpath <- "Data/Fire GIS Files/"
 buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
 
 #set crs of shp to same as for cci raster
-buf <- st_transform(buf, "+proj=longlat +datum=WGS84 +no_defs")
+buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
 ```
 
 Load LTR dummy raster (for extent and resolution) and set projection)
@@ -40,15 +30,18 @@ Load LTR dummy raster (for extent and resolution) and set projection)
 #ltr_res <- raster("Data/NBRanalysis/LTR_JanApr_95.tif")
 #ltr_res <- projectRaster(ltr_res, crs="+proj=longlat +datum=WGS84 +no_defs")
 #writeRaster(ltr_res, "Data/NBRanalysis/ltr_res.grd")
-ltr_res <- raster("Data/NBRanalysis/ltr_res.grd")
+ltr_res <- raster("Data/NBRanalysis/LTR_JanApr_1.tif")
 ```
 
 Load DEM, set extent and resolution to LTR, mask to >2000m
 ```{r results = 'hide', warning=F, message=F}
-dem <- raster('Data/SRTM/srtm_22_11/srtm_22_11.tif')
-dem <- crop(dem, extent(ltr_res))
-dem <-resample(dem, ltr_res)
+#dem <- raster('Data/SRTM/srtm_22_11/srtm_22_11.tif')
+#dem <- projectRaster(dem, crs="+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs", method='ngb')
+#dem <- crop(dem, extent(ltr_res))
+#dem <-resample(dem, ltr_res)
+#writeRaster(dem, 'Data/SRTM/srtm_ltr.tif')
 
+dem<- raster('Data/SRTM/srtm_ltr.tif')
 elevize <- function(x) { ifelse(x < 2000, NA, x) }
 dem2000 <- calc(dem, elevize)
 ```
@@ -85,10 +78,11 @@ Convert to raster with extent/resolution of LTR
 #gfa16 <- rasterize(gfa16, ltr_res, field=2016, background=0)
 
 gfa_stk <- stack()
-
-years <- 2011:2016
+years <- 2012:2016
 for(yr in years){
   gfa  <- st_read(paste0("Data/MODIS/Global_Fire_Atlas/",yr,"/GFA_perimeter_elev_",yr,".shp"))
+  
+  gfa <- st_transform(gfa, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
   gfa_ras <- rasterize(gfa, ltr_res, field=yr, background=0)
   
   gfa_stk <- stack(gfa_stk, gfa_ras)
@@ -111,13 +105,13 @@ NAize <- function(x) { ifelse(x == 0, NA, x) }
 gfa_max <- calc(gfa_max, NAize)
 gfa_sum <- calc(gfa_sum, NAize)
 
-writeRaster(gfa_max, "Data/NBRanalysis/gfa_max.grd")
-writeRaster(gfa_sum, "Data/NBRanalysis/gfa_sum.grd")
+writeRaster(gfa_max, "Data/NBRanalysis/gfa_max_utm.grd", overwrite=TRUE)
+writeRaster(gfa_sum, "Data/NBRanalysis/gfa_sum_utm.grd", overwrite=TRUE)
 ```
 
 ```{r}
-gfa_max <- raster("Data/NBRanalysis/gfa_max.grd")
-gfa_sum <- raster("Data/NBRanalysis/gfa_sum.grd")
+gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
+gfa_sum <- raster("Data/NBRanalysis/gfa_sum_utm.grd")
 
 ```
 
@@ -127,23 +121,33 @@ For cells with MODIS fire, calc proportion of LTR pixels that are also fire:
 Load landsat raster  [change this to use SRTM DEM to decide study area]
 ```{r}
 
-scenario <- 1
-grp <- "JanApr"
-#scenario_list <- seq(from=1,to=144,by=1)
-scenario_list <- c(1,95)
+gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
+
+#scenario <- 1
+#grp <- "JanApr"
+scenario_list <- seq(from=1,to=144,by=1)
+#scenario_list <- c(95,2)
 
 for(scenario in scenario_list){
   
   for(grp in c("JanApr","AllYear")){
 
     print(paste0(grp,"_",scenario))
+    
+    #MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+    raster_tmp_dir <- "/r_raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+    dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+    rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+    
+    
     dat <- stack(paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,".tif"))
     dat <- dat[[1]]  #layer 1 is year
-    dat <- projectRaster(dat, crs="+proj=longlat +datum=WGS84 +no_defs", method='ngb')
-  
+    
+
+    print(paste0("dat and gfa_max rasters are comparable: ",compareRaster(gfa_max,dat)))
+    
     matches <- gfa_max == dat
     ct <- crosstab(matches,gfa_max)  #misses are 0s, hits are 1s
-    ct <- ct[,2:6]  #drop 2011 (column 1) to leave 2012:2016
     
     #get false alarms [count(dat) - (hits + misses)]
     hm <- colSums(ct) #hits+misses
@@ -154,7 +158,11 @@ for(scenario in scenario_list){
     ct <- rbind(ct,fa)  #bind to table
     row.names(ct) <- c("misses","hits","F-alarms") #set row.names
     
-    write.csv(ct, paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,"-fa.csv"))
+    write.csv(ct, paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,".csv"))
+    
+    #remember to delete the temp raster later!  for example
+    unlink(raster_tmp_dir, recursive = T, force = T)
+
   }
 }
 
