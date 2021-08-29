@@ -315,11 +315,14 @@ Plot:
 
 ```{r}
 
-plotPropHM <- function(.dat){
+plotProps <- function(.dat, .var){
 
+  #.dat=propsDat
+  #.var="propHM"
+  
   #for loop across parameter sets (to split plots for legibility)
   Pset_filter <- data.frame(rbind(c(0,24),c(24,48),c(48,72),c(72,96),c(96,120),c(120,144)))
-  row <- 1
+  #row <- 1
   #loop over pset groups and plot
   for(row in 1:length(Pset_filter[,1])){
     
@@ -327,20 +330,34 @@ plotPropHM <- function(.dat){
     upper <- Pset_filter[row,2]
   
     plotDat <- .dat %>%
+      select(year:grp, {{.var}}) %>%
       filter(pset > lower & pset <= upper) %>%
       mutate(pset = formatC(pset, width = 3, format = "d", flag = "0")) %>%  #pad with preceeding 0s so that plots margins are identical
       mutate(pset = factor(pset)) %>%
       mutate(year = factor(year)) 
   
-    p <- ggplot(plotDat, aes(fill=year, y=count, x=grp)) + 
-      geom_bar(position="stack", stat="identity") +
+    p <- ggplot(plotDat, aes(fill=year, y=.data[[.var]], x=grp)) + 
+      geom_bar(position="dodge",stat="identity") +
       facet_grid(.~pset) +
-      ylim(0,maxcount) +
+      ylim(0,0.1) +
+      labs(title=.var) + 
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
   
     print(p)
   }
 }
+
+```
+```{r}
+propsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props.csv"))
+
+pdf("Data/MODIS/Global_Fire_Atlas/PropHM_PixelOverlap.pdf", width=10, height=10)
+plotProps(propsDat, "propHM")
+dev.off()
+
+pdf("Data/MODIS/Global_Fire_Atlas/PropHF_PixelOverlap.pdf", width=10, height=10)
+plotProps(propsDat, "propHF")
+dev.off()
 
 ```
 
