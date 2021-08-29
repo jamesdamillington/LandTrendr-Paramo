@@ -11,7 +11,7 @@ output:
 ```{r warning=F, message=F}
 library(raster)
 library(sf)
-library(dplyr)
+library(tidyverse)
 ```
 
 
@@ -174,23 +174,30 @@ Kris suggests checking overlap between MODIS and year+1 for LTR  [also check ove
 
 ```{r}
 
-#library(tidyverse)
+
 #scenario <- 1
 #grp <- "JanApr"
 #scenario_list <- c(1,95)
 
 scenario_list <- seq(from=1,to=144,by=1)
 
-dat_tbl <- tibble(
+counts_tbl <- tibble(
   year=character(),
-  count=numeric(),
   pset=numeric(),
-  grp=character()
+  grp=character(),
+  hits=numeric(),
+  misses=numeric(),
+  falarms=numeric()
 )
-m_tbl <- dat_tbl
-h_tbl <- dat_tbl
-fa_tbl <- dat_tbl
-    
+
+props_tbl <- tibble(
+  year=character(),
+  pset=numeric(),
+  grp=character(),
+  propHM=numeric(),
+  propHF=numeric()
+)
+
 for(scenario in scenario_list){
   
   for(grp in c("JanApr","AllYear")){
@@ -201,44 +208,59 @@ for(scenario in scenario_list){
 
     misses <- po %>% 
       slice(1) %>%
-      pivot_longer(cols=everything(), names_to="year",values_to="count") %>%
-      mutate(pset=scenario,grp=grp)
-    m_tbl <- bind_rows(m_tbl, misses)
+      pivot_longer(cols=everything(), names_to="year",values_to="misses")
     
     hits <- po %>% 
       slice(2) %>%
-      pivot_longer(cols=everything(), names_to="year",values_to="count") %>%
-      mutate(pset=scenario,grp=grp)
-    h_tbl <- bind_rows(h_tbl, hits)
-    
+      pivot_longer(cols=everything(), names_to="year",values_to="hits")
+      
     falarm <- po %>% 
       slice(3) %>%
-      pivot_longer(cols=everything(), names_to="year",values_to="count") %>%
-      mutate(pset=scenario,grp=grp)
-    fa_tbl <- bind_rows(fa_tbl, falarm)
+      pivot_longer(cols=everything(), names_to="year",values_to="falarms")
     
+    counts <- inner_join(hits,misses,by="year")
+    counts <- inner_join(counts,falarm,by="year")
+    counts <- mutate(counts, pset=scenario,grp=grp)
+    counts_tbl <- bind_rows(counts_tbl, counts)
+    
+    #proportion of hits to misses
+    propHM <- round(po[2,]/po[1,],5)
+    propHM <-pivot_longer(propHM, cols=everything(), names_to="year",values_to="propHM")
+    
+    #proportion of hits to false alarms
+    propHF <- round(po[2,]/po[3,],5)
+    propHF <-pivot_longer(propHF, cols=everything(), names_to="year",values_to="propHF")
+    
+    props <- inner_join(propHM,propHF,by="year")
+    props <- mutate(props, pset=scenario,grp=grp)
+    props_tbl <- bind_rows(props_tbl, props)
   }
 }
 
-write_csv(m_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Misses.csv")
-write_csv(h_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Hits.csv")
-write_csv(fa_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_FalseAlarms.csv")
+write_csv(counts_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts.csv")
+write_csv(props_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props.csv")
+
 
 ```
 
 ```{r}
 
-plotCounts <- function(.dat){
+plotCounts <- function(.dat, .var){
 
+  #.dat=countsDat
+  #.var="misses"
+  
   maxcount <- .dat %>%
+    select(year:grp, {{.var}}) %>%
     group_by(pset, grp) %>%
-    summarise(counts = sum(count)) 
+    summarise(counts = sum(.data[[.var]])) 
     
   maxcount <- ceiling(max(maxcount$counts))
   
   #for loop across parameter sets (to split plots for legibility)
   Pset_filter <- data.frame(rbind(c(0,24),c(24,48),c(48,72),c(72,96),c(96,120),c(120,144)))
   
+  #row=1
   #loop over pset groups and plot
   for(row in 1:length(Pset_filter[,1])){
     
@@ -246,15 +268,17 @@ plotCounts <- function(.dat){
     upper <- Pset_filter[row,2]
   
     plotDat <- .dat %>%
+      select(year:grp, {{.var}}) %>%
       filter(pset > lower & pset <= upper) %>%
       mutate(pset = formatC(pset, width = 3, format = "d", flag = "0")) %>%  #pad with preceeding 0s so that plots margins are identical
       mutate(pset = factor(pset)) %>%
       mutate(year = factor(year))
   
-    p <- ggplot(plotDat, aes(fill=year, y=count, x=grp)) + 
+    p <- ggplot(plotDat, aes(fill=year, y=.data[[.var]], x=grp)) + 
       geom_bar(position="stack", stat="identity") +
       facet_grid(.~pset) +
       ylim(0,maxcount) +
+      labs(title=.var) + 
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
   
     print(p)
@@ -266,21 +290,57 @@ plotCounts <- function(.dat){
 ```{r}
 
 
-Hall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Hits.csv"))
-Mall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Misses.csv"))
-Fall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_FalseAlarms.csv"))
+countsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts.csv"))
+#Mall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Misses.csv"))
+#Fall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_FalseAlarms.csv"))
 
-pdf("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Hits.pdf", width=10, height=10)
-plotCounts(Hall)
+pdf("Data/MODIS/Global_Fire_Atlas/Hits_PixelOverlap.pdf", width=10, height=10)
+plotCounts(countsDat, "hits")
 dev.off()
 
-pdf("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Misses.pdf", width=10, height=10)
-plotCounts(Mall)
+pdf("Data/MODIS/Global_Fire_Atlas/Misses_PixelOverlap.pdf", width=10, height=10)
+plotCounts(countsDat, "misses")
 dev.off()
 
-pdf("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Fall.pdf", width=10, height=10)
-plotCounts(Fall)
+pdf("Data/MODIS/Global_Fire_Atlas/FAlarms_PixelOverlap.pdf", width=10, height=10)
+plotCounts(countsDat, "falarms")
 dev.off()
+
+```
+
+Plot:
+- proportion of hits to misses
+- proportion of hits to false alarms
+
+
+```{r}
+
+plotPropHM <- function(.dat){
+
+  #for loop across parameter sets (to split plots for legibility)
+  Pset_filter <- data.frame(rbind(c(0,24),c(24,48),c(48,72),c(72,96),c(96,120),c(120,144)))
+  row <- 1
+  #loop over pset groups and plot
+  for(row in 1:length(Pset_filter[,1])){
+    
+    lower <- Pset_filter[row,1]
+    upper <- Pset_filter[row,2]
+  
+    plotDat <- .dat %>%
+      filter(pset > lower & pset <= upper) %>%
+      mutate(pset = formatC(pset, width = 3, format = "d", flag = "0")) %>%  #pad with preceeding 0s so that plots margins are identical
+      mutate(pset = factor(pset)) %>%
+      mutate(year = factor(year)) 
+  
+    p <- ggplot(plotDat, aes(fill=year, y=count, x=grp)) + 
+      geom_bar(position="stack", stat="identity") +
+      facet_grid(.~pset) +
+      ylim(0,maxcount) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+    print(p)
+  }
+}
 
 ```
 
