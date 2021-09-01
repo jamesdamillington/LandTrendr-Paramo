@@ -118,13 +118,16 @@ gfa_sum <- raster("Data/NBRanalysis/gfa_sum_utm.grd")
 For cells with MODIS fire, calc proportion of LTR pixels that are also fire:
 [what if all are 100% covered? then need to think about how many of cells _surrounding_ the MODIS fire is 'burned' by LTR]
 
-Load landsat raster  [change this to use SRTM DEM to decide study area]
+Calculate for LTR vs Global Fire Atlas:
+- hits (pixels are burned in both products)
+- misses (pixels burned in GFA but not LTR)
+- false alarms  (pixels burned in LTR but not GFA)
 ```{r}
 
 gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
 
-#scenario <- 1
-#grp <- "JanApr"
+scenario <- 1
+grp <- "JanApr"
 scenario_list <- seq(from=130,to=144,by=1)
 #scenario_list <- c(95,2)
 
@@ -147,7 +150,10 @@ for(scenario in scenario_list){
     print(paste0("dat and gfa_max rasters are comparable: ",compareRaster(gfa_max,dat)))
     
     matches <- gfa_max == dat
+    matches1 <- gfa_max == dat + 1
+    
     ct <- crosstab(matches,gfa_max)  #misses are 0s, hits are 1s
+    ct1 <- crosstab(matches1,gfa_max)  #misses are 0s, hits are 1s
     
     #get false alarms [count(dat) - (hits + misses)]
     hm <- colSums(ct) #hits+misses
@@ -168,10 +174,7 @@ for(scenario in scenario_list){
 
 ```
 
-Results are not good. Need to set up code to run all NBR files.... 
-
-Kris suggests checking overlap between MODIS and year+1 for LTR  [also check overlap with GABAM... and GABAM vs Global Fire Atlas]
-
+Collate counts and proportions (also calc props) from individual files per pset into combined files for plotting 
 ```{r}
 
 
@@ -243,6 +246,7 @@ write_csv(props_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props.csv")
 
 ```
 
+Function to plot bar charts of counts of hits, misses, FA 
 ```{r}
 
 plotCounts <- function(.dat, .var){
@@ -287,12 +291,11 @@ plotCounts <- function(.dat, .var){
 
 ```
 
+
+Run the counts plotting (output to pdf)
 ```{r}
 
-
 countsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts.csv"))
-#Mall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Misses.csv"))
-#Fall <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_FalseAlarms.csv"))
 
 pdf("Data/MODIS/Global_Fire_Atlas/Hits_PixelOverlap.pdf", width=10, height=10)
 plotCounts(countsDat, "hits")
@@ -308,11 +311,9 @@ dev.off()
 
 ```
 
-Plot:
+Function to plot bar charts of 
 - proportion of hits to misses
 - proportion of hits to false alarms
-
-
 ```{r}
 
 plotProps <- function(.dat, .var){
@@ -348,6 +349,8 @@ plotProps <- function(.dat, .var){
 }
 
 ```
+
+Run the proportions plotting (output to pdf)
 ```{r}
 propsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props.csv"))
 
@@ -360,6 +363,65 @@ plotProps(propsDat, "propHF")
 dev.off()
 
 ```
+
+Kris suggests checking overlap between MODIS and year+1 for LTR  [also check overlap with GABAM... and GABAM vs Global Fire Atlas]
+
+GFA 2012 - 2016
+LTR 2012 - 2019
+
+Compare GFA 2012 with LTR 2013
+Compare GFA 2013 with LTR 2014
+...
+Compare GFA 2016 with LTR 2017
+
+So use code as above but with `matches1 <- gfa_max == dat + 1` (see raster-comparison-proof.r for proof this works)
+
+```{r}
+
+gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
+
+scenario <- 1
+grp <- "JanApr"
+scenario_list <- seq(from=130,to=144,by=1)
+#scenario_list <- c(95,2)
+
+for(scenario in scenario_list){
+  
+  for(grp in c("JanApr","AllYear")){
+
+    print(paste0(grp,"_",scenario))
+    
+    #MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+    raster_tmp_dir <- "/r_raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+    dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+    rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+    
+    dat <- stack(paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,".tif"))
+    dat <- dat[[1]]  #layer 1 is year
+    
+    print(paste0("dat and gfa_max rasters are comparable: ",compareRaster(gfa_max,dat)))
+    
+    matches1 <- gfa_max == dat + 1
+    ct1 <- crosstab(matches1,gfa_max)  #misses are 0s, hits are 1s
+    
+    #get false alarms [count(dat) - (hits + misses)]
+    hm <- colSums(ct1) #hits+misses
+    fdat <- freq(dat) #counts
+    fdat <- fdat[2:6,2] #get counts for 2012:2016
+    
+    fa <- fdat - hm     #false alarms
+    ct1 <- rbind(ct1,fa)  #bind to table
+    row.names(ct1) <- c("misses","hits","F-alarms") #set row.names
+    
+    write.csv(ct1, paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,"-offset-LTRp1.csv"))
+    
+    #remember to delete the temp raster later!  for example
+    unlink(raster_tmp_dir, recursive = T, force = T)
+  }
+}
+
+```
+
 
 ```{r}
 matches1 <- gfa_max == dat
