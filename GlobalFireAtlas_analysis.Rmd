@@ -175,7 +175,7 @@ for(scenario in scenario_list){
 ```
 
 Collate counts and proportions (also calc props) from individual files per pset into combined files for plotting 
-```{r}
+```{r, collate}
 
 
 #scenario <- 1
@@ -205,7 +205,7 @@ for(scenario in scenario_list){
   
   for(grp in c("JanApr","AllYear")){
     
-    po <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,".csv"), 
+    po <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,"-offset-LTRp1.csv"), 
                    col_select=-1, 
                    col_types=cols(.default="i"))
 
@@ -240,8 +240,8 @@ for(scenario in scenario_list){
   }
 }
 
-write_csv(counts_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts.csv")
-write_csv(props_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props.csv")
+write_csv(counts_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts-offset-LTRp1.csv")
+write_csv(props_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props-offset-LTRp1.csv")
 
 
 ```
@@ -293,19 +293,19 @@ plotCounts <- function(.dat, .var){
 
 
 Run the counts plotting (output to pdf)
-```{r}
+```{r, run-count-plots}
 
-countsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts.csv"))
+countsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts-offset-LTRp1.csv"))
 
-pdf("Data/MODIS/Global_Fire_Atlas/Hits_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/Hits_PixelOverlap-offset-LTRp1.pdf", width=10, height=10)
 plotCounts(countsDat, "hits")
 dev.off()
 
-pdf("Data/MODIS/Global_Fire_Atlas/Misses_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/Misses_PixelOverlap-offset-LTRp1.pdf", width=10, height=10)
 plotCounts(countsDat, "misses")
 dev.off()
 
-pdf("Data/MODIS/Global_Fire_Atlas/FAlarms_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/FAlarms_PixelOverlap-offset-LTRp1.pdf", width=10, height=10)
 plotCounts(countsDat, "falarms")
 dev.off()
 
@@ -351,14 +351,14 @@ plotProps <- function(.dat, .var){
 ```
 
 Run the proportions plotting (output to pdf)
-```{r}
-propsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props.csv"))
+```{r, run-props-plots}
+propsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props-offset-LTRp1.csv"))
 
-pdf("Data/MODIS/Global_Fire_Atlas/PropHM_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/PropHM_PixelOverlap-offset-LTRp1.pdf", width=10, height=10)
 plotProps(propsDat, "propHM")
 dev.off()
 
-pdf("Data/MODIS/Global_Fire_Atlas/PropHF_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/PropHF_PixelOverlap-offset-LTRp1.pdf", width=10, height=10)
 plotProps(propsDat, "propHF")
 dev.off()
 
@@ -421,6 +421,17 @@ for(scenario in scenario_list){
 }
 
 ```
+
+Then run the following code chunks but adding `-offset-LTRp1` to filenames:
+- collate
+- run-count-plots
+- run-props-plots
+
+
+
+
+
+
 
 
 ```{r}
