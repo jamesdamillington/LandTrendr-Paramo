@@ -380,9 +380,9 @@ So use code as above but with `matches1 <- gfa_max == dat + 1` (see raster-compa
 
 gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
 
-scenario <- 1
-grp <- "JanApr"
-scenario_list <- seq(from=130,to=144,by=1)
+#scenario <- 1
+#grp <- "JanApr"
+scenario_list <- seq(from=1,to=144,by=1)
 #scenario_list <- c(95,2)
 
 for(scenario in scenario_list){
