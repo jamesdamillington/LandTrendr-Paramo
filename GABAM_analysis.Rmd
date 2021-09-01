@@ -1,0 +1,79 @@
+---
+title: "LandTrendr-Paramo - GABAM"
+author: "James Millington"
+date: "2021-09-01"
+output: 
+  github_document:
+    toc: true
+---
+
+
+```{r warning=F, message=F}
+library(raster)
+library(sf)
+library(tidyverse)
+```
+
+Load GABAM raster
+```{r}
+
+gabam <- raster("Data/GABAM/N10W080_2012.TIF")
+
+paramo_2deg_ext <- extent(-74, -72, 5, 7) 
+
+gabam_crop <- crop(gabam,paramo_2deg_ext)
+gabam_crop <- projectRaster(gabam_crop, crs="+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
+
+GISpath <- "Data/Fire GIS Files/" 
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
+buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
+
+plot(gabam_crop)
+plot(buf, add=T)
+
+```
+
+
+```{r}
+
+paramo_2deg_ext <- extent(-74, -72, 5, 7)
+
+gabam_stk <- stack()
+years <- 2012:2016
+for(yr in years){
+  gabam_ras  <- raster(paste0("Data/GABAM/N10W080_",yr,".TIF"))
+  gabam_stk <- stack(gabam_stk, gabam_ras)
+}
+
+gabam_stk_crop <- crop(gabam_stk,paramo_2deg_ext)
+gabam_stk_crp <- stack()
+years <- 2012:2016
+for(yr in years){
+  i <- yr - 2011
+  gabam_stk_crop_yr <- subs(gabam_stk_crop[[i]], data.frame(cbind(1,yr)), by=1, which=2)
+  gabam_stk_crp <- stack(gabam_stk_crp, gabam_stk_crop_yr)
+}
+
+gabam_stk_crp_utm <- projectRaster(gabam_stk_crp, crs="+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
+
+dem<- raster('Data/SRTM/srtm_ltr.tif')
+elevize <- function(x) { ifelse(x < 2000, NA, x) }
+dem2000 <- calc(dem, elevize)
+
+gabam_stk_crp_utm <- crop(gabam_stk_crp_utm, extent(dem2000))
+gabam_stk_crp_utm <- resample(gabam_stk_crp_utm, dem2000)
+
+gabam_stk_elev2000 <- mask(gabam_stk_crp_utm, dem2000)
+
+gabam_max <- overlay(gabam_stk_elev2000, fun=max)
+gabam_sum <- overlay(gabam_stk_elev2000, fun=sum)
+
+NAize <- function(x) { ifelse(x == 0, NA, x) }
+gfa_max <- calc(gfa_max, NAize)
+gfa_sum <- calc(gfa_sum, NAize)
+
+writeRaster(gfa_max, "Data/NBRanalysis/gfa_max_utm.grd", overwrite=TRUE)
+writeRaster(gfa_sum, "Data/NBRanalysis/gfa_sum_utm.grd", overwrite=TRUE)
+
+
+```
