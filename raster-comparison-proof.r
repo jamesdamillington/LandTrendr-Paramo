@@ -53,3 +53,10 @@ ct1 <- crosstab(matches1,r1)  #misses are 0s, hits are 1s
 row.names(ct1) <- c("dift","same") #set row.names
 ct1
 
+#proof of overlay with max
+r1[,1] <- NA
+plot(r1)
+r1r2 <- stack(r1,r2)
+plot(r1r2)
+mmax <- overlay(r1r2, fun=max, na.rm=T)
+plot(mmax)
