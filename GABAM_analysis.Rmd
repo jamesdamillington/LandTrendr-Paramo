@@ -28,52 +28,169 @@ GISpath <- "Data/Fire GIS Files/"
 buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
 buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
 
-plot(gabam_crop)
-plot(buf, add=T)
+plot(dem)
+plot(st_geometry(buf), add=T)
+
+demll <- projectRaster(dem, crs="+proj=longlat +datum=WGS84 +no_defs", method='ngb')
 
 ```
 
 
 ```{r}
 
-paramo_2deg_ext <- extent(-74, -72, 5, 7)
+    #MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+    raster_tmp_dir <- "/r_raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+    dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+    rasterOptions(tmpdir = raster_tmp_dir,
+                  memfrac=0.3)  ## set raster options
 
+paramo_2deg_ext <- extent(-74, -72, 5, 7)
+#yr <- 2012
 gabam_stk <- stack()
 years <- 2012:2016
 for(yr in years){
+  print(paste0(yr))
   gabam_ras  <- raster(paste0("Data/GABAM/N10W080_",yr,".TIF"))
-  gabam_stk <- stack(gabam_stk, gabam_ras)
+  print("read")
+  gabam_ras  <- crop(gabam_ras,paramo_2deg_ext)
+  print("cropped")
+  print(gabam_ras)
+  gabam_ras <- subs(gabam_ras, data.frame(from=1,to=yr))
+  print("subbed")
+  writeRaster(gabam_ras, paste0("Data/GABAM/N10W080_",yr,"_crp.TIF"))
+  print("written")
+  #gabam_stk <- stack(gabam_stk, gabam_ras_crp)
+  #rm(gabam_ras,gabam_ras_crp)
 }
+```
 
-gabam_stk_crop <- crop(gabam_stk,paramo_2deg_ext)
+```{r}
+
 gabam_stk_crp <- stack()
 years <- 2012:2016
 for(yr in years){
-  i <- yr - 2011
-  gabam_stk_crop_yr <- subs(gabam_stk_crop[[i]], data.frame(cbind(1,yr)), by=1, which=2)
-  gabam_stk_crp <- stack(gabam_stk_crp, gabam_stk_crop_yr)
+  
+  gabam_ras  <- raster(paste0("Data/GABAM/N10W080_",yr,"_crp.TIF"))
+  gabam_stk_crp <- stack(gabam_stk_crp, gabam_ras)
+  rm(gabam_ras)
 }
 
-gabam_stk_crp_utm <- projectRaster(gabam_stk_crp, crs="+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
+gabam_stk_crp_utm <- projectRaster(gabam_stk_crp, crs="+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs", method='ngb')
+
+writeRaster(gabam_stk_crp_utm, paste0("Data/GABAM/gabam_stk_utm.TIF"))
+
+rm(gabam_stk_crp)
 
 dem<- raster('Data/SRTM/srtm_ltr.tif')
 elevize <- function(x) { ifelse(x < 2000, NA, x) }
 dem2000 <- calc(dem, elevize)
 
 gabam_stk_crp_utm <- crop(gabam_stk_crp_utm, extent(dem2000))
+writeRaster(gabam_stk_crp_utm, paste0("Data/GABAM/gabam_stk_utm_dem.TIF"))
 gabam_stk_crp_utm <- resample(gabam_stk_crp_utm, dem2000)
-
+writeRaster(gabam_stk_crp_utm, paste0("Data/GABAM/gabam_stk_utm_resp.TIF"))
 gabam_stk_elev2000 <- mask(gabam_stk_crp_utm, dem2000)
+writeRaster(gabam_stk_elev2000, paste0("Data/GABAM/gabam_stk_utm_mask.TIF"))
 
-gabam_max <- overlay(gabam_stk_elev2000, fun=max)
-gabam_sum <- overlay(gabam_stk_elev2000, fun=sum)
+unNAize <- function(x) { ifelse(is.na(x), 0, x) }
+gabam_stk_elev2000_z <- calc(gabam_stk_elev2000,unNAize)
+
+gabam_max <- overlay(gabam_stk_elev2000_z, fun=max)
+gabam_sum <- overlay(gabam_stk_elev2000_z, fun=sum)
 
 NAize <- function(x) { ifelse(x == 0, NA, x) }
-gfa_max <- calc(gfa_max, NAize)
-gfa_sum <- calc(gfa_sum, NAize)
+gabam_max <- calc(gabam_max, NAize)
+gabam_sum <- calc(gabam_sum, NAize)
 
-writeRaster(gfa_max, "Data/NBRanalysis/gfa_max_utm.grd", overwrite=TRUE)
-writeRaster(gfa_sum, "Data/NBRanalysis/gfa_sum_utm.grd", overwrite=TRUE)
+writeRaster(gabam_max, "Data/NBRanalysis/gabam_max_utm.grd", overwrite=TRUE)
+writeRaster(gabam_sum, "Data/NBRanalysis/gabam_sum_utm.grd", overwrite=TRUE)
 
+plot(gabam_max)
+
+```
+
+
+```{r}
+
+gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
+gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
+
+
+print(paste0("gfa_max and gabam_max rasters are comparable: ",compareRaster(gfa_max,gabam_max)))
+
+matches <- gfa_max == gabam_max
+
+ct <- crosstab(matches,gfa_max)  #misses are 0s, hits are 1s
+
+#get false alarms [count(dat) - (hits + misses)]
+hm <- colSums(ct) #hits+misses
+fdat <- freq(gabam_max) #counts
+fdat <- fdat[1:5,2] #get counts for 2012:2016
+
+fa <- fdat - hm     #false alarms
+
+propHM <- round(ct[2,] / hm,4)
+propHF <- round(ct[2,] / fa,4)
+
+out <- rbind(ct,fa,propHM,propHF)  #bind to table
+
+row.names(out) <- c("misses","hits","F-alarms","propHM","propHF") #set row.names
+
+write.csv(out, paste0("Data/GABAM/PixelOverlap_gabam.csv"))
+
+```
+
+
+
+
+```{r}
+
+gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
+
+#scenario <- 2
+#grp <- "JanApr"
+scenario_list <- seq(from=1,to=144,by=1)
+#scenario_list <- c(95,2)
+
+for(scenario in scenario_list){
+  
+  for(grp in c("JanApr","AllYear")){
+
+    print(paste0(grp,"_",scenario))
+    
+    #MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+    raster_tmp_dir <- "/r_raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+    dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+    rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+    
+    
+    dat <- stack(paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,".tif"))
+    dat <- dat[[1]]  #layer 1 is year
+    
+
+    print(paste0("dat and gabam_max rasters are comparable: ",compareRaster(gabam_max,dat)))
+    
+    matches <- gabam_max == dat
+    #matches1 <- gfa_max == dat + 1
+    
+    ct <- crosstab(matches,gabam_max)  #misses are 0s, hits are 1s
+    #ct1 <- crosstab(matches1,gfa_max)  #misses are 0s, hits are 1s
+    
+    #get false alarms [count(dat) - (hits + misses)]
+    hm <- colSums(ct) #hits+misses
+    fdat <- freq(dat) #counts
+    fdat <- fdat[2:6,2] #get counts for 2012:2016
+    
+    fa <- fdat - hm     #false alarms
+    ct <- rbind(ct,fa)  #bind to table
+    row.names(ct) <- c("misses","hits","F-alarms") #set row.names
+    
+    write.csv(ct, paste0("Data/GABAM/PixelOverlap_",grp,"_",scenario,"gabam.csv"))
+    
+    #remember to delete the temp raster later!  for example
+    unlink(raster_tmp_dir, recursive = T, force = T)
+
+  }
+}
 
 ```
