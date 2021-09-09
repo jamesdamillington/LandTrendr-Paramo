@@ -109,7 +109,7 @@ ggplot(ltr_ha_long, aes(x=pset,y=ha,fill=year)) +
 
 ``` {r}
 
-#selection <- c(79,80,87,88,95,96,103,104,111,112,119,120,127,128,135,136,143,144) 
+selection <- c(79,80,87,88,95,96,103,104,111,112,119,120,127,128,135,136,143,144) 
 selection1 <- c(80,88,96,104,112,120,128,136,144)
 selection2 <- c(79,87,95,103,111,119,127,135,143) 
 
@@ -134,4 +134,31 @@ Or convert to binary (fire, no fire) and sum (assumes years will be the same)
 
 If all very similar then pick one from odds above and one from evens (e.g. 143 and 144) and compare each to GFA and GABAM respectively.
 
+``` {r}
+#need to run this code on windows machine... 
 
+binarize <- function(x) { ifelse(x > 0, 1, NA) }
+
+for(scenario in selection){
+  
+  for(grp in c("JanApr","AllYear")){
+
+    print(paste0(grp,"_",scenario))
+    
+    #MEMORY MANAGEMENT see https://r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+    raster_tmp_dir <- "/r_raster_tmp"  ## define the name of a temp directory where raster tmp files will be stored
+    dir.create(raster_tmp_dir, showWarnings = F, recursive = T)  ## create the directory
+    rasterOptions(tmpdir = raster_tmp_dir)  ## set raster options
+    
+    
+    dat <- stack(paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,".tif"))
+    dat <- dat[[1]]  #layer 1 is year
+    
+    bindat <- calc(dat, binarize)
+    
+    writeRaster(bindat, paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,"_binary.tif"))
+  }
+}
+
+
+```
