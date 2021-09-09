@@ -110,15 +110,28 @@ ggplot(ltr_ha_long, aes(x=pset,y=ha,fill=year)) +
 ``` {r}
 
 #selection <- c(79,80,87,88,95,96,103,104,111,112,119,120,127,128,135,136,143,144) 
-selection <- c(80,88,96,104,112,120,128,136,144)
+selection1 <- c(80,88,96,104,112,120,128,136,144)
+selection2 <- c(79,87,95,103,111,119,127,135,143) 
 
 ltr_ha_long %>%
-  filter(pset %in% selection) %>%
+  filter(pset %in% selection1) %>%
   ggplot( aes(x=pset,y=ha,fill=year)) +
          geom_bar(stat="identity",position="dodge")
 
+ltr_ha_long %>%
+  filter(pset %in% selection2) %>%
+  ggplot( aes(x=pset,y=ha,fill=year)) +
+         geom_bar(stat="identity",position="dodge")
 
 ```
 
 
-Compare spatial distribution of the psets above - does that help to choose?
+Compare spatial distribution of the psets above - does that help to choose? I guess the spatial distribution among LTR will be very similar?  
+
+Check by comparing pixel ids? 
+
+Or convert to binary (fire, no fire) and sum (assumes years will be the same)
+
+If all very similar then pick one from odds above and one from evens (e.g. 143 and 144) and compare each to GFA and GABAM respectively.
+
+
