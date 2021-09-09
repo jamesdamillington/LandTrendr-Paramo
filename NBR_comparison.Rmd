@@ -1,0 +1,124 @@
+---
+title: "LandTrendr-Paramo - comparisons"
+author: "James Millington"
+date: "2021-09-09"
+output: 
+  github_document:
+    toc: true
+---
+
+
+```{r warning=F, message=F}
+library(raster)
+library(sf)
+library(tidyverse)
+```
+
+```{r}
+
+GISpath <- "Data/Fire GIS Files/" 
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
+buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
+
+gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
+gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
+
+plot(gfa_max)
+plot(st_geometry(buf), add=T)
+
+
+plot(gabam_max)
+plot(st_geometry(buf), add=T)
+
+```
+
+
+```{r}
+gfa_freq <- freq(gfa_max)
+gabam_freq <- freq(gabam_max)
+
+all_freq <- left_join(as.data.frame(gfa_freq), as.data.frame(gabam_freq), by = "value", suffix=c(".gfa",".gabam"))
+  
+all_ha <- all_freq %>%
+  mutate(gfa = count.gfa * 0.09) %>% 
+  mutate(gabam = count.gabam * 0.09) %>%
+  rename(year = value) %>%
+  pivot_longer(cols=c("gfa","gabam"),
+               names_to="sensor",
+               values_to="ha") %>%
+  select(-starts_with("count")) %>%
+  drop_na()
+
+ggplot(all_ha, aes(x=year, y=ha, fill=sensor)) +
+         geom_bar(stat="identity",position="dodge")
+
+```
+
+
+```{r}
+
+scenario_list <- seq(from=1,to=144,by=1)
+#scenario_list <- c(95,2)
+
+ha_tbl <- tibble(
+  pset=numeric(),
+  grp=character(),
+  '2012'=numeric(),
+  '2013'=numeric(),
+  '2014'=numeric(),
+  '2015'=numeric(),
+  '2016'=numeric()
+)
+
+for(scenario in scenario_list){
+  
+  for(grp in c("JanApr","AllYear")){
+    
+    #scenario <- 141
+    #grp <- "AllYear"
+    dat <- read_csv(paste0("/home/james/wdResearch/LandTrendr-Paramo/Data/GABAM/PixelOverlap_",grp,"_",scenario,"gabam.csv"))
+    
+    dats <- dat %>%
+      summarise_if(is.numeric, ~ sum(.x) * 0.09) %>%
+      #across(.cols = everything(), ~ .x * 0.09) %>%
+      mutate(pset=scenario, grp=grp)
+      
+    ha_tbl <- bind_rows(ha_tbl, dats)
+    
+  }
+}
+
+write_csv(ha_tbl,"Data/NBRanalysis/LTRha.csv")
+
+```
+
+```{r}
+
+ltr_ha <- read_csv("Data/NBRanalysis/LTRha.csv")
+
+ltr_ha_long <- ltr_ha %>%
+  filter(grp=="AllYear") %>%
+  select(-grp) %>%
+  pivot_longer(`2012`:`2016`, values_to = "ha", names_to="year")
+
+ggplot(ltr_ha_long, aes(x=pset,y=ha,fill=year)) +
+         geom_bar(stat="identity",position="dodge")
+
+```
+
+
+``` {r}
+
+#selection <- c(79,80,87,88,95,96,103,104,111,112,119,120,127,128,135,136,143,144) 
+selection <- c(80,88,96,104,112,120,128,136,144)
+
+ltr_ha_long %>%
+  filter(pset %in% selection) %>%
+  ggplot( aes(x=pset,y=ha,fill=year)) +
+         geom_bar(stat="identity",position="dodge")
+
+
+```
+
+
+Compare spatial distribution of the psets above - does that help to choose?
