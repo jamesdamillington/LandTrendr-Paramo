@@ -115,7 +115,6 @@ plot(gabam_max)
 gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
 gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
 
-
 print(paste0("gfa_max and gabam_max rasters are comparable: ",compareRaster(gfa_max,gabam_max)))
 
 matches <- gfa_max == gabam_max
@@ -194,3 +193,196 @@ for(scenario in scenario_list){
 }
 
 ```
+
+
+Collate counts and proportions (also calc props) from individual files per pset into combined files for plotting 
+```{r, collate}
+
+
+#scenario <- 1
+#grp <- "JanApr"
+#scenario_list <- c(1,95)
+
+scenario_list <- seq(from=1,to=144,by=1)
+
+counts_tbl <- tibble(
+  year=character(),
+  pset=numeric(),
+  grp=character(),
+  hits=numeric(),
+  misses=numeric(),
+  falarms=numeric()
+)
+
+props_tbl <- tibble(
+  year=character(),
+  pset=numeric(),
+  grp=character(),
+  propHM=numeric(),
+  propHF=numeric()
+)
+
+for(scenario in scenario_list){
+  
+  for(grp in c("JanApr","AllYear")){
+    
+    po <- read_csv(paste0("Data/GABAM/PixelOverlap_",grp,"_",scenario,"gabam.csv"), 
+                   col_select=-1, 
+                   col_types=cols(.default="i"))
+
+    misses <- po %>% 
+      slice(1) %>%
+      pivot_longer(cols=everything(), names_to="year",values_to="misses")
+    
+    hits <- po %>% 
+      slice(2) %>%
+      pivot_longer(cols=everything(), names_to="year",values_to="hits")
+      
+    falarm <- po %>% 
+      slice(3) %>%
+      pivot_longer(cols=everything(), names_to="year",values_to="falarms")
+    
+    counts <- inner_join(hits,misses,by="year")
+    counts <- inner_join(counts,falarm,by="year")
+    counts <- mutate(counts, pset=scenario,grp=grp)
+    counts_tbl <- bind_rows(counts_tbl, counts)
+    
+    #proportion of hits to misses
+    propHM <- round(po[2,]/po[1,],5)
+    propHM <-pivot_longer(propHM, cols=everything(), names_to="year",values_to="propHM")
+    
+    #proportion of hits to false alarms
+    propHF <- round(po[2,]/po[3,],5)
+    propHF <-pivot_longer(propHF, cols=everything(), names_to="year",values_to="propHF")
+    
+    props <- inner_join(propHM,propHF,by="year")
+    props <- mutate(props, pset=scenario,grp=grp)
+    props_tbl <- bind_rows(props_tbl, props)
+  }
+}
+
+write_csv(counts_tbl, "Data/GABAM/PixelOverlap_Counts-gabam.csv")
+write_csv(props_tbl, "Data/GABAM/PixelOverlap_Props-gabam.csv")
+
+
+```
+
+
+Function to plot bar charts of counts of hits, misses, FA 
+```{r}
+
+plotCounts <- function(.dat, .var){
+
+  #.dat=countsDat
+  #.var="misses"
+  
+  maxcount <- .dat %>%
+    select(year:grp, {{.var}}) %>%
+    group_by(pset, grp) %>%
+    summarise(counts = sum(.data[[.var]])) 
+    
+  maxcount <- ceiling(max(maxcount$counts))
+  
+  #for loop across parameter sets (to split plots for legibility)
+  Pset_filter <- data.frame(rbind(c(0,24),c(24,48),c(48,72),c(72,96),c(96,120),c(120,144)))
+  
+  #row=1
+  #loop over pset groups and plot
+  for(row in 1:length(Pset_filter[,1])){
+    
+    lower <- Pset_filter[row,1]
+    upper <- Pset_filter[row,2]
+  
+    plotDat <- .dat %>%
+      select(year:grp, {{.var}}) %>%
+      filter(pset > lower & pset <= upper) %>%
+      mutate(pset = formatC(pset, width = 3, format = "d", flag = "0")) %>%  #pad with preceeding 0s so that plots margins are identical
+      mutate(pset = factor(pset)) %>%
+      mutate(year = factor(year))
+  
+    p <- ggplot(plotDat, aes(fill=year, y=.data[[.var]], x=grp)) + 
+      geom_bar(position="stack", stat="identity") +
+      facet_grid(.~pset) +
+      ylim(0,maxcount) +
+      labs(title=.var) + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+    print(p)
+  }
+}
+
+```
+
+
+Run the counts plotting (output to pdf)
+```{r, run-count-plots}
+
+countsDat <- read_csv(paste0("Data/GABAM/PixelOverlap_Counts-gabam.csv"))
+
+pdf("Data/GABAM/Hits_PixelOverlap-gabam.pdf", width=10, height=10)
+plotCounts(countsDat, "hits")
+dev.off()
+
+pdf("Data/GABAM/Misses_PixelOverlap-gabam.pdf", width=10, height=10)
+plotCounts(countsDat, "misses")
+dev.off()
+
+pdf("Data/GABAM/FAlarms_PixelOverlap-gabam.pdf", width=10, height=10)
+plotCounts(countsDat, "falarms")
+dev.off()
+
+```
+
+Function to plot bar charts of 
+- proportion of hits to misses
+- proportion of hits to false alarms
+```{r}
+
+plotProps <- function(.dat, .var){
+
+  #.dat=propsDat
+  #.var="propHM"
+  
+  #for loop across parameter sets (to split plots for legibility)
+  Pset_filter <- data.frame(rbind(c(0,24),c(24,48),c(48,72),c(72,96),c(96,120),c(120,144)))
+  #row <- 1
+  #loop over pset groups and plot
+  for(row in 1:length(Pset_filter[,1])){
+    
+    lower <- Pset_filter[row,1]
+    upper <- Pset_filter[row,2]
+  
+    plotDat <- .dat %>%
+      select(year:grp, {{.var}}) %>%
+      filter(pset > lower & pset <= upper) %>%
+      mutate(pset = formatC(pset, width = 3, format = "d", flag = "0")) %>%  #pad with preceeding 0s so that plots margins are identical
+      mutate(pset = factor(pset)) %>%
+      mutate(year = factor(year)) 
+  
+    p <- ggplot(plotDat, aes(fill=year, y=.data[[.var]], x=grp)) + 
+      geom_bar(position="dodge",stat="identity") +
+      facet_grid(.~pset) +
+      ylim(0,0.1) +
+      labs(title=.var) + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+    print(p)
+  }
+}
+
+```
+
+Run the proportions plotting (output to pdf)
+```{r, run-props-plots}
+propsDat <- read_csv(paste0("Data/GABAM/PixelOverlap_Props-gabam.csv"))
+
+pdf("Data/GABAM/PropHM_PixelOverlap-gabam.pdf", width=10, height=10)
+plotProps(propsDat, "propHM")
+dev.off()
+
+pdf("Data/GABAM/PropHF_PixelOverlap-gabam.pdf", width=10, height=10)
+plotProps(propsDat, "propHF")
+dev.off()
+
+```
+
