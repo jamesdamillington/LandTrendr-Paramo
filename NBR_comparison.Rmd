@@ -110,16 +110,30 @@ ggplot(ltr_ha_long, aes(x=pset,y=ha,fill=year)) +
 ``` {r}
 
 selection <- c(79,80,87,88,95,96,103,104,111,112,119,120,127,128,135,136,143,144) 
-selection1 <- c(80,88,96,104,112,120,128,136,144)
-selection2 <- c(79,87,95,103,111,119,127,135,143) 
+mag400 <- c(80,88,96,104,112,120,128,136,144)  #magnitude = 400
+mag350 <- selection1 - 1   #magnitude = 350
+mag300 <- selection2 - 1   #magniture = 300
+
+p005 <- c(79, 103, 127)  #mag = 350, pval = 0.05
 
 ltr_ha_long %>%
-  filter(pset %in% selection1) %>%
+  filter(pset %in% mag400) %>%
   ggplot( aes(x=pset,y=ha,fill=year)) +
          geom_bar(stat="identity",position="dodge")
 
 ltr_ha_long %>%
-  filter(pset %in% selection2) %>%
+  filter(pset %in% mag300) %>%
+  ggplot( aes(x=pset,y=ha,fill=year)) +
+         geom_bar(stat="identity",position="dodge")
+
+
+ltr_ha_long %>%
+  filter(pset %in% mag350) %>%
+  ggplot( aes(x=pset,y=ha,fill=year)) +
+         geom_bar(stat="identity",position="dodge")
+
+ltr_ha_long %>%
+  filter(pset %in% p005) %>%
   ggplot( aes(x=pset,y=ha,fill=year)) +
          geom_bar(stat="identity",position="dodge")
 
