@@ -146,14 +146,15 @@ write.csv(out, paste0("Data/GABAM/PixelOverlap_gabam.csv"))
 
 gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
 
-#scenario <- 2
-#grp <- "JanApr"
-scenario_list <- seq(from=1,to=144,by=1)
+#scenario <- 143
+#grp <- "AllYear"
+scenario_list <- seq(from=144,to=1,by=-1)
 #scenario_list <- c(95,2)
 
 for(scenario in scenario_list){
   
   for(grp in c("JanApr","AllYear")){
+  #for(grp in c("JanApr")){
 
     print(paste0(grp,"_",scenario))
     
@@ -175,12 +176,13 @@ for(scenario in scenario_list){
     ct <- crosstab(matches,gabam_max)  #misses are 0s, hits are 1s
     #ct1 <- crosstab(matches1,gfa_max)  #misses are 0s, hits are 1s
     
-    #get false alarms [count(dat) - (hits + misses)]
-    hm <- colSums(ct) #hits+misses
+    
+    hits <- ct[2,]  #hits
     fdat <- freq(dat) #counts
     fdat <- fdat[2:6,2] #get counts for 2012:2016
     
-    fa <- fdat - hm     #false alarms
+    #get false alarms [count(dat) - hits]
+    fa <- fdat - hits     #false alarms
     ct <- rbind(ct,fa)  #bind to table
     row.names(ct) <- c("misses","hits","F-alarms") #set row.names
     
