@@ -126,9 +126,9 @@ Calculate for LTR vs Global Fire Atlas:
 
 gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
 
-scenario <- 1
-grp <- "JanApr"
-scenario_list <- seq(from=130,to=144,by=1)
+#scenario <- 1
+#grp <- "JanApr"
+scenario_list <- seq(from=144,to=1,by=-1)
 #scenario_list <- c(95,2)
 
 for(scenario in scenario_list){
@@ -150,17 +150,17 @@ for(scenario in scenario_list){
     print(paste0("dat and gfa_max rasters are comparable: ",compareRaster(gfa_max,dat)))
     
     matches <- gfa_max == dat
-    matches1 <- gfa_max == dat + 1
+    #matches1 <- gfa_max == dat + 1
     
     ct <- crosstab(matches,gfa_max)  #misses are 0s, hits are 1s
-    ct1 <- crosstab(matches1,gfa_max)  #misses are 0s, hits are 1s
+    #ct1 <- crosstab(matches1,gfa_max)  #misses are 0s, hits are 1s
     
-    #get false alarms [count(dat) - (hits + misses)]
-    hm <- colSums(ct) #hits+misses
+    hits <- ct[2,]  #hits
     fdat <- freq(dat) #counts
     fdat <- fdat[2:6,2] #get counts for 2012:2016
     
-    fa <- fdat - hm     #false alarms
+    #get false alarms [count(dat) - hits]
+    fa <- fdat - hits     #false alarms
     ct <- rbind(ct,fa)  #bind to table
     row.names(ct) <- c("misses","hits","F-alarms") #set row.names
     
