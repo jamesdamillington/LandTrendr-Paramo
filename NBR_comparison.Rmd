@@ -111,8 +111,8 @@ ggplot(ltr_ha_long, aes(x=pset,y=ha,fill=year)) +
 
 selection <- c(79,80,87,88,95,96,103,104,111,112,119,120,127,128,135,136,143,144) 
 mag400 <- c(80,88,96,104,112,120,128,136,144)  #magnitude = 400
-mag350 <- selection1 - 1   #magnitude = 350
-mag300 <- selection2 - 1   #magniture = 300
+mag350 <- mag400 - 1   #magnitude = 350
+mag300 <- mag350 - 1   #magniture = 300
 
 p005 <- c(79, 103, 127)  #mag = 350, pval = 0.05
 
@@ -139,6 +139,22 @@ ltr_ha_long %>%
 
 ```
 
+```{r}
+
+ltr_ha_long_grp <- ltr_ha %>%
+  #filter(grp=="AllYear") %>%
+  #select(-grp) %>%
+  pivot_longer(`2012`:`2016`, values_to = "ha", names_to="year")
+
+ltr_ha_long_grp %>%
+  filter(pset %in% mag350) %>%
+  ggplot( aes(x=pset,y=ha,fill=year)) +
+         geom_bar(stat="identity",position="dodge") +
+  facet_grid(grp~.) +
+  ggtitle("LTR (Mag = 350)")
+
+
+```
 
 Compare spatial distribution of the psets above - does that help to choose? I guess the spatial distribution among LTR will be very similar?  
 
