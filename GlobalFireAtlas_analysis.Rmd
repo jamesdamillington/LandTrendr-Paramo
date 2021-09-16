@@ -113,6 +113,10 @@ writeRaster(gfa_sum, "Data/NBRanalysis/gfa_sum_utm.grd", overwrite=TRUE)
 gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
 gfa_sum <- raster("Data/NBRanalysis/gfa_sum_utm.grd")
 
+
+
+
+
 ```
 
 For cells with MODIS fire, calc proportion of LTR pixels that are also fire:
@@ -124,10 +128,11 @@ Calculate for LTR vs Global Fire Atlas:
 - false alarms  (pixels burned in LTR but not GFA)
 ```{r}
 
-gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
+mymask <- raster("Data/Fire GIS Files/GroundTruthingBuffer500m_mask_trim.tif")
+gfa_maxm <- raster("Data/NBRanalysis/gfa_max_masked.grd")
 
-#scenario <- 1
-#grp <- "JanApr"
+scenario <- 1
+grp <- "JanApr"
 scenario_list <- seq(from=144,to=1,by=-1)
 #scenario_list <- c(95,2)
 
@@ -145,15 +150,22 @@ for(scenario in scenario_list){
     
     dat <- stack(paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,".tif"))
     dat <- dat[[1]]  #layer 1 is year
-    
 
-    print(paste0("dat and gfa_max rasters are comparable: ",compareRaster(gfa_max,dat)))
+    dat <- crop(dat, mymask)
+    dat <- mask(dat, mymask)     
+
+    print(paste0("dat and gfa_max rasters are comparable: ",compareRaster(gfa_maxm,dat)))
     
-    matches <- gfa_max == dat
+    matches <- gfa_maxm == dat
     #matches1 <- gfa_max == dat + 1
     
-    ct <- crosstab(matches,gfa_max)  #misses are 0s, hits are 1s
+    ct <- crosstab(matches,gfa_maxm)  #misses are 0s, hits are 1s
     #ct1 <- crosstab(matches1,gfa_max)  #misses are 0s, hits are 1s
+    
+    #no fires in 2012 so add dummy column
+    missingyr <- matrix(c(0,0),ncol=1)
+    colnames(missingyr) <- 2012
+    ct <- cbind(missingyr, ct)
     
     hits <- ct[2,]  #hits
     fdat <- freq(dat) #counts
@@ -164,11 +176,10 @@ for(scenario in scenario_list){
     ct <- rbind(ct,fa)  #bind to table
     row.names(ct) <- c("misses","hits","F-alarms") #set row.names
     
-    write.csv(ct, paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,".csv"))
+    write.csv(ct, paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,"_masked.csv"))
     
     #remember to delete the temp raster later!  for example
     unlink(raster_tmp_dir, recursive = T, force = T)
-
     
   }
 }
@@ -206,7 +217,7 @@ for(scenario in scenario_list){
   
   for(grp in c("JanApr","AllYear")){
     
-    po <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,".csv"), 
+    po <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_",grp,"_",scenario,"_masked.csv"), 
                    col_select=-1, 
                    col_types=cols(.default="i"))
 
@@ -241,8 +252,8 @@ for(scenario in scenario_list){
   }
 }
 
-write_csv(counts_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts.csv")
-write_csv(props_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props.csv")
+write_csv(counts_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts_masked.csv")
+write_csv(props_tbl, "Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props_masked.csv")
 
 
 ```
@@ -296,17 +307,17 @@ plotCounts <- function(.dat, .var){
 Run the counts plotting (output to pdf)
 ```{r, run-count-plots}
 
-countsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts.csv"))
+countsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Counts_masked.csv"))
 
-pdf("Data/MODIS/Global_Fire_Atlas/Hits_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/Hits_PixelOverlap_masked.pdf", width=10, height=10)
 plotCounts(countsDat, "hits")
 dev.off()
 
-pdf("Data/MODIS/Global_Fire_Atlas/Misses_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/Misses_PixelOverlap_masked.pdf", width=10, height=10)
 plotCounts(countsDat, "misses")
 dev.off()
 
-pdf("Data/MODIS/Global_Fire_Atlas/FAlarms_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/FAlarms_PixelOverlap_masked.pdf", width=10, height=10)
 plotCounts(countsDat, "falarms")
 dev.off()
 
@@ -353,13 +364,13 @@ plotProps <- function(.dat, .var){
 
 Run the proportions plotting (output to pdf)
 ```{r, run-props-plots}
-propsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props.csv"))
+propsDat <- read_csv(paste0("Data/MODIS/Global_Fire_Atlas/PixelOverlap_Props_masked.csv"))
 
-pdf("Data/MODIS/Global_Fire_Atlas/PropHM_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/PropHM_PixelOverlap_masked.pdf", width=10, height=10)
 plotProps(propsDat, "propHM")
 dev.off()
 
-pdf("Data/MODIS/Global_Fire_Atlas/PropHF_PixelOverlap.pdf", width=10, height=10)
+pdf("Data/MODIS/Global_Fire_Atlas/PropHF_PixelOverlap_masked.pdf", width=10, height=10)
 plotProps(propsDat, "propHF")
 dev.off()
 

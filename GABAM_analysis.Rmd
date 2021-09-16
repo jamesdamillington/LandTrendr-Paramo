@@ -161,8 +161,9 @@ writeRaster(gabam_max_masked, "Data/NBRanalysis/gabam_max_masked.grd")
 
 ```{r}
 
-mymask <- raster("E:/LandTrendr-Paramo/Data/Fire GIS Files/GroundTruthingBuffer500m_mask_trim.tif")
+mymask <- raster("Data/Fire GIS Files/GroundTruthingBuffer500m_mask_trim.tif")
 gabam_maxm <- raster("Data/NBRanalysis/gabam_max_masked.grd")
+
 
 
 
@@ -174,7 +175,7 @@ scenario_list <- seq(from=144,to=1,by=-1)
 for(scenario in scenario_list){
   
   #for(grp in c("JanApr","AllYear")){
-  for(grp in c("AllYear")){
+  for(grp in c("JanApr")){
 
     print(paste0(grp,"_",scenario))
     
@@ -250,7 +251,7 @@ for(scenario in scenario_list){
   
   for(grp in c("JanApr","AllYear")){
     
-    po <- read_csv(paste0("Data/GABAM/PixelOverlap_",grp,"_",scenario,"gabam.csv"), 
+    po <- read_csv(paste0("Data/GABAM/PixelOverlap_",grp,"_",scenario,"gabam_masked.csv"), 
                    col_select=-1, 
                    col_types=cols(.default="i"))
 
@@ -285,8 +286,8 @@ for(scenario in scenario_list){
   }
 }
 
-write_csv(counts_tbl, "Data/GABAM/PixelOverlap_Counts-gabam.csv")
-write_csv(props_tbl, "Data/GABAM/PixelOverlap_Props-gabam.csv")
+write_csv(counts_tbl, "Data/GABAM/PixelOverlap_Counts-gabam_masked.csv")
+write_csv(props_tbl, "Data/GABAM/PixelOverlap_Props-gabam_masked.csv")
 
 
 ```
@@ -341,17 +342,17 @@ plotCounts <- function(.dat, .var){
 Run the counts plotting (output to pdf)
 ```{r, run-count-plots}
 
-countsDat <- read_csv(paste0("Data/GABAM/PixelOverlap_Counts-gabam.csv"))
+countsDat <- read_csv(paste0("Data/GABAM/PixelOverlap_Counts-gabam_masked.csv"))
 
-pdf("Data/GABAM/Hits_PixelOverlap-gabam.pdf", width=10, height=10)
+pdf("Data/GABAM/Hits_PixelOverlap-gabam_masked.pdf", width=10, height=10)
 plotCounts(countsDat, "hits")
 dev.off()
 
-pdf("Data/GABAM/Misses_PixelOverlap-gabam.pdf", width=10, height=10)
+pdf("Data/GABAM/Misses_PixelOverlap-gabam_masked.pdf", width=10, height=10)
 plotCounts(countsDat, "misses")
 dev.off()
 
-pdf("Data/GABAM/FAlarms_PixelOverlap-gabam.pdf", width=10, height=10)
+pdf("Data/GABAM/FAlarms_PixelOverlap-gabam_masked.pdf", width=10, height=10)
 plotCounts(countsDat, "falarms")
 dev.off()
 
@@ -398,13 +399,13 @@ plotProps <- function(.dat, .var){
 
 Run the proportions plotting (output to pdf)
 ```{r, run-props-plots}
-propsDat <- read_csv(paste0("Data/GABAM/PixelOverlap_Props-gabam.csv"))
+propsDat <- read_csv(paste0("Data/GABAM/PixelOverlap_Props-gabam_masked.csv"))
 
-pdf("Data/GABAM/PropHM_PixelOverlap-gabam.pdf", width=10, height=10)
+pdf("Data/GABAM/PropHM_PixelOverlap-gabam_masked.pdf", width=10, height=10)
 plotProps(propsDat, "propHM")
 dev.off()
 
-pdf("Data/GABAM/PropHF_PixelOverlap-gabam.pdf", width=10, height=10)
+pdf("Data/GABAM/PropHF_PixelOverlap-gabam_masked.pdf", width=10, height=10)
 plotProps(propsDat, "propHF")
 dev.off()
 
