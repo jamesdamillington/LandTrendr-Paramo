@@ -23,12 +23,68 @@ buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
 gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
 gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
 
+ltr127ay <- raster("Data/NBRanalysis/LTR_AllYear_127.tif")
+NAize <- function(x) { ifelse(x == 0, NA, x) }
+ltr127ay <- calc(ltr127ay, NAize)
+
 plot(gfa_max)
 plot(st_geometry(buf), add=T)
 
-
 plot(gabam_max)
 plot(st_geometry(buf), add=T)
+
+plot(ltr127ay)
+plot(st_geometry(buf), add=T)
+
+```
+
+```{r}
+
+mymask <- raster("/home/james/wdResearch/LandTrendr-Paramo/Data/GIS/GroundTruthingBuffer500m_mask_trim.tif")
+
+maxize <- function(x) { ifelse(x > 2016, NA, x) }
+ltr_max<- calc(ltr127ay, maxize)
+ltr_crop <- crop(ltr_max, mymask)
+ltr_masked <- mask(ltr_crop, mymask) 
+
+gfa_max_crop <- crop(gfa_max, mymask)
+gfa_max_masked <- mask(gfa_max_crop, mymask) 
+
+gabam_max_crop <- crop(gabam_max, mymask)
+gabam_max_masked <- mask(gabam_max_crop, mymask) 
+
+plot(gfa_max_masked)
+plot(st_geometry(buf), add=T)
+
+plot(gabam_max_masked)
+plot(st_geometry(buf), add=T)
+
+plot(ltr_masked)
+plot(st_geometry(buf), add=T)
+
+```
+
+```{r}
+
+oneize <- function(x) { ifelse(x > 0, 1, NA) }
+ltr1s<- calc(ltr_masked, oneize)
+ltr1s_proj <- projectRaster(from = ltr1s, crs = CRS("+init=epsg:3857"),method='ngb')
+
+gabam1s<- calc(gabam_max_masked, oneize)
+gabam_proj <- projectRaster(from = gabam1s, crs = CRS("+init=epsg:3857"),method='ngb')
+
+
+buf_proj <- st_transform(buf, crs=3857)
+
+redPal <- RColorBrewer::brewer.pal('Set1', n=1)
+redTheme <- rasterTheme(region = c('#FF0000'))
+
+ltrlp <- levelplot(ltr1s_proj, margin=F, par.settings=redTheme, colorkey=F)
+ltrlp + latticeExtra::layer(sp.polygons(as_Spatial(from = st_geometry(buf_proj)),col="black"))
+
+gabamlp <- levelplot(gabam_proj, margin=F, par.settings=redTheme, colorkey=F)
+gabamlp + latticeExtra::layer(sp.polygons(as_Spatial(from = st_geometry(buf_proj)),col="black"))
+
 
 ```
 
@@ -36,21 +92,29 @@ plot(st_geometry(buf), add=T)
 ```{r}
 gfa_freq <- freq(gfa_max)
 gabam_freq <- freq(gabam_max)
+ltr_freq <- freq(ltr127ay)
 
 all_freq <- left_join(as.data.frame(gfa_freq), as.data.frame(gabam_freq), by = "value", suffix=c(".gfa",".gabam"))
+all_freq <- left_join(all_freq, as.data.frame(ltr_freq), by = "value")
+
   
 all_ha <- all_freq %>%
   mutate(gfa = count.gfa * 0.09) %>% 
   mutate(gabam = count.gabam * 0.09) %>%
+  mutate(ltr = count * 0.09) %>%
   rename(year = value) %>%
-  pivot_longer(cols=c("gfa","gabam"),
+  pivot_longer(cols=c("gfa","gabam", "ltr"),
                names_to="sensor",
                values_to="ha") %>%
   select(-starts_with("count")) %>%
   drop_na()
 
 ggplot(all_ha, aes(x=year, y=ha, fill=sensor)) +
-         geom_bar(stat="identity",position="dodge")
+  geom_bar(stat="identity",position="dodge") +
+  scale_fill_viridis_d("Product") +
+  xlab("Year") +
+  ylab("Burned Area (ha)") +
+  ggtitle("Burned Area by Product and Year")
 
 ```
 
