@@ -139,12 +139,32 @@ write.csv(out, paste0("Data/GABAM/PixelOverlap_gabam.csv"))
 
 ```
 
+```{r}
 
+gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
+gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
+
+mymask <- raster("E:/LandTrendr-Paramo/Data/Fire GIS Files/GroundTruthingBuffer500m_mask_trim.tif")
+
+gfa_max_crop <- crop(gfa_max, mymask)
+gfa_max_masked <- mask(gfa_max_crop, mymask) 
+writeRaster(gfa_max_masked, "Data/NBRanalysis/gfa_max_masked.grd")
+
+
+gabam_max_crop <- crop(gabam_max, mymask)
+gabam_max_masked <- mask(gabam_max_crop, mymask) 
+writeRaster(gabam_max_masked, "Data/NBRanalysis/gabam_max_masked.grd")
+
+
+```
 
 
 ```{r}
 
-gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
+mymask <- raster("E:/LandTrendr-Paramo/Data/Fire GIS Files/GroundTruthingBuffer500m_mask_trim.tif")
+gabam_maxm <- raster("Data/NBRanalysis/gabam_max_masked.grd")
+
+
 
 #scenario <- 143
 #grp <- "AllYear"
@@ -153,8 +173,8 @@ scenario_list <- seq(from=144,to=1,by=-1)
 
 for(scenario in scenario_list){
   
-  for(grp in c("JanApr","AllYear")){
-  #for(grp in c("JanApr")){
+  #for(grp in c("JanApr","AllYear")){
+  for(grp in c("AllYear")){
 
     print(paste0(grp,"_",scenario))
     
@@ -167,13 +187,15 @@ for(scenario in scenario_list){
     dat <- stack(paste0("Data/NBRanalysis/LTR_",grp,"_",scenario,".tif"))
     dat <- dat[[1]]  #layer 1 is year
     
+    dat <- crop(dat, mymask)
+    dat <- mask(dat, mymask) 
 
-    print(paste0("dat and gabam_max rasters are comparable: ",compareRaster(gabam_max,dat)))
+    print(paste0("dat and gabam_max rasters are comparable: ",compareRaster(gabam_maxm,dat)))
     
-    matches <- gabam_max == dat
+    matches <- gabam_maxm == dat
     #matches1 <- gfa_max == dat + 1
     
-    ct <- crosstab(matches,gabam_max)  #misses are 0s, hits are 1s
+    ct <- crosstab(matches,gabam_maxm)  #misses are 0s, hits are 1s
     #ct1 <- crosstab(matches1,gfa_max)  #misses are 0s, hits are 1s
     
     
@@ -186,7 +208,7 @@ for(scenario in scenario_list){
     ct <- rbind(ct,fa)  #bind to table
     row.names(ct) <- c("misses","hits","F-alarms") #set row.names
     
-    write.csv(ct, paste0("Data/GABAM/PixelOverlap_",grp,"_",scenario,"gabam.csv"))
+    write.csv(ct, paste0("Data/GABAM/PixelOverlap_",grp,"_",scenario,"gabam_masked.csv"))
     
     #remember to delete the temp raster later!  for example
     unlink(raster_tmp_dir, recursive = T, force = T)
