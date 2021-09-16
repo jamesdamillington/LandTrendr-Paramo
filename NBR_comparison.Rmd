@@ -23,6 +23,9 @@ buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
 gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
 gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
 
+gfa_max_masked <- raster("Data/NBRanalysis/gfa_max_masked.grd")
+gabam_max_masked <- raster("Data/NBRanalysis/gabam_max_masked.grd")
+
 ltr127ay <- raster("Data/NBRanalysis/LTR_AllYear_127.tif")
 NAize <- function(x) { ifelse(x == 0, NA, x) }
 ltr127ay <- calc(ltr127ay, NAize)
@@ -90,20 +93,23 @@ gabamlp + latticeExtra::layer(sp.polygons(as_Spatial(from = st_geometry(buf_proj
 
 
 ```{r}
-gfa_freq <- freq(gfa_max)
-gabam_freq <- freq(gabam_max)
-ltr_freq <- freq(ltr127ay)
+gfa_freq <- freq(gfa_max_masked)
+gabam_freq <- freq(gabam_max_masked)
+#ltr_freq <- freq(ltr127ay)
+
+gfa_freq <- rbind(gfa_freq, c(2012,0))
 
 all_freq <- left_join(as.data.frame(gfa_freq), as.data.frame(gabam_freq), by = "value", suffix=c(".gfa",".gabam"))
-all_freq <- left_join(all_freq, as.data.frame(ltr_freq), by = "value")
+#all_freq <- left_join(all_freq, as.data.frame(ltr_freq), by = "value")
 
   
 all_ha <- all_freq %>%
   mutate(gfa = count.gfa * 0.09) %>% 
   mutate(gabam = count.gabam * 0.09) %>%
-  mutate(ltr = count * 0.09) %>%
+  #mutate(ltr = count * 0.09) %>%
   rename(year = value) %>%
-  pivot_longer(cols=c("gfa","gabam", "ltr"),
+  #pivot_longer(cols=c("gfa","gabam", "ltr"),
+  pivot_longer(cols=c("gfa","gabam"),
                names_to="sensor",
                values_to="ha") %>%
   select(-starts_with("count")) %>%
