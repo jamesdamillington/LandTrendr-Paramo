@@ -12,8 +12,10 @@ output:
 library(raster)
 library(sf)
 library(tidyverse)
+library(rasterVis)
 ```
 
+unmasked maps
 ```{r}
 
 GISpath <- "Data/Fire GIS Files/" 
@@ -22,9 +24,6 @@ buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
 
 gfa_max <- raster("Data/NBRanalysis/gfa_max_utm.grd")
 gabam_max <- raster("Data/NBRanalysis/gabam_max_utm.grd")
-
-gfa_max_masked <- raster("Data/NBRanalysis/gfa_max_masked.grd")
-gabam_max_masked <- raster("Data/NBRanalysis/gabam_max_masked.grd")
 
 ltr127ay <- raster("Data/NBRanalysis/LTR_AllYear_127.tif")
 NAize <- function(x) { ifelse(x == 0, NA, x) }
@@ -40,13 +39,47 @@ plot(ltr127ay)
 plot(st_geometry(buf), add=T)
 
 ```
+masked maps
+```{r}
+GISpath <- "Data/Fire GIS Files/" 
+buf <- st_read(paste0(GISpath,"500mbufferOfComplejos/GroundTruthingBuffer500m.shp"))
+buf <- st_transform(buf, "+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs")
+
+gfa_max_masked <- raster("Data/NBRanalysis/gfa_max_masked.grd")
+gabam_max_masked <- raster("Data/NBRanalysis/gabam_max_masked.grd")
+
+mymask <- raster("/home/james/wdResearch/LandTrendr-Paramo/Data/GIS/GroundTruthingBuffer500m_mask_trim.tif")
+
+
+ltr126ay <- raster("Data/NBRanalysis/LTR_AllYear_126.tif")
+
+ltr126ay <- crop(ltr126ay, mymask)
+ltr126ay <- mask(ltr126ay, mymask) 
+
+NAize <- function(x) { ifelse(x == 0, NA, x) }
+ltr126ay <- calc(ltr126ay, NAize)
+
+maxize <- function(x) { ifelse(x > 2016, NA, x) }
+ltr_masked <- calc(ltr126ay, maxize)
+
+plot(gfa_max_masked)
+plot(st_geometry(buf), add=T)
+
+plot(gabam_max_masked)
+plot(st_geometry(buf), add=T)
+
+plot(ltr_masked)
+plot(st_geometry(buf), add=T)
+
+```
+
 
 ```{r}
 
 mymask <- raster("/home/james/wdResearch/LandTrendr-Paramo/Data/GIS/GroundTruthingBuffer500m_mask_trim.tif")
 
 maxize <- function(x) { ifelse(x > 2016, NA, x) }
-ltr_max<- calc(ltr127ay, maxize)
+ltr_max<- calc(ltr126ay, maxize)
 ltr_crop <- crop(ltr_max, mymask)
 ltr_masked <- mask(ltr_crop, mymask) 
 
@@ -76,9 +109,14 @@ ltr1s_proj <- projectRaster(from = ltr1s, crs = CRS("+init=epsg:3857"),method='n
 gabam1s<- calc(gabam_max_masked, oneize)
 gabam_proj <- projectRaster(from = gabam1s, crs = CRS("+init=epsg:3857"),method='ngb')
 
+gfa1s<- calc(gfa_max_masked, oneize)
+gfa_proj <- projectRaster(from = gfa1s, crs = CRS("+init=epsg:3857"),method='ngb')
+
 
 buf_proj <- st_transform(buf, crs=3857)
+```
 
+```{r}
 redPal <- RColorBrewer::brewer.pal('Set1', n=1)
 redTheme <- rasterTheme(region = c('#FF0000'))
 
@@ -88,28 +126,29 @@ ltrlp + latticeExtra::layer(sp.polygons(as_Spatial(from = st_geometry(buf_proj))
 gabamlp <- levelplot(gabam_proj, margin=F, par.settings=redTheme, colorkey=F)
 gabamlp + latticeExtra::layer(sp.polygons(as_Spatial(from = st_geometry(buf_proj)),col="black"))
 
-
+gfslp <- levelplot(gfa_proj, margin=F, par.settings=redTheme, colorkey=F)
+gfslp + latticeExtra::layer(sp.polygons(as_Spatial(from = st_geometry(buf_proj)),col="black"))
 ```
 
 
 ```{r}
 gfa_freq <- freq(gfa_max_masked)
 gabam_freq <- freq(gabam_max_masked)
-#ltr_freq <- freq(ltr127ay)
+ltr_freq <- freq(ltr_masked)
 
 gfa_freq <- rbind(gfa_freq, c(2012,0))
 
 all_freq <- left_join(as.data.frame(gfa_freq), as.data.frame(gabam_freq), by = "value", suffix=c(".gfa",".gabam"))
-#all_freq <- left_join(all_freq, as.data.frame(ltr_freq), by = "value")
+all_freq <- left_join(all_freq, as.data.frame(ltr_freq), by = "value")
 
   
 all_ha <- all_freq %>%
   mutate(gfa = count.gfa * 0.09) %>% 
   mutate(gabam = count.gabam * 0.09) %>%
-  #mutate(ltr = count * 0.09) %>%
+  mutate(ltr = count * 0.09) %>%
   rename(year = value) %>%
-  #pivot_longer(cols=c("gfa","gabam", "ltr"),
-  pivot_longer(cols=c("gfa","gabam"),
+  pivot_longer(cols=c("gfa","gabam", "ltr"),
+  #pivot_longer(cols=c("gfa","gabam"),
                names_to="sensor",
                values_to="ha") %>%
   select(-starts_with("count")) %>%
@@ -124,7 +163,7 @@ ggplot(all_ha, aes(x=year, y=ha, fill=sensor)) +
 
 ```
 
-
+Calculate burned area for all LTR psets 
 ```{r}
 
 scenario_list <- seq(from=1,to=144,by=1)
@@ -146,7 +185,7 @@ for(scenario in scenario_list){
     
     #scenario <- 141
     #grp <- "AllYear"
-    dat <- read_csv(paste0("/home/james/wdResearch/LandTrendr-Paramo/Data/GABAM/PixelOverlap_",grp,"_",scenario,"gabam.csv"))
+    dat <- read_csv(paste0("/home/james/wdResearch/LandTrendr-Paramo/Data/GABAM/PixelOverlap_",grp,"_",scenario,"gabam_masked.csv"))
     
     dats <- dat %>%
       summarise_if(is.numeric, ~ sum(.x) * 0.09) %>%
@@ -158,10 +197,11 @@ for(scenario in scenario_list){
   }
 }
 
-write_csv(ha_tbl,"Data/NBRanalysis/LTRha.csv")
+write_csv(ha_tbl,"Data/NBRanalysis/LTRha_masked.csv")
 
 ```
 
+Plot LTR burned area using output of code block above 
 ```{r}
 
 ltr_ha <- read_csv("Data/NBRanalysis/LTRha.csv")
@@ -176,36 +216,70 @@ ggplot(ltr_ha_long, aes(x=pset,y=ha,fill=year)) +
 
 ```
 
+Plot LTR burned area using summary of counts
+```{r}
 
+ltr_counts <- read_csv("Data/GABAM/PixelOverlap_Counts-gabam_masked.csv")
+
+ltr_ha_long <- ltr_counts %>%
+  rowwise() %>%
+  mutate(ha = sum(hits, falarms) * 0.09) %>%
+  mutate(year = as.factor(year)) %>%
+  select(-hits, -misses, -falarms)
+
+ggplot(ltr_ha_long, aes(x=pset,y=ha,fill=year)) +
+         geom_bar(stat="identity",position="dodge")
+         
+
+```
+
+
+plot specific combinations of LTR psets 
 ``` {r}
 
 selection <- c(79,80,87,88,95,96,103,104,111,112,119,120,127,128,135,136,143,144) 
 mag400 <- c(80,88,96,104,112,120,128,136,144)  #magnitude = 400
 mag350 <- mag400 - 1   #magnitude = 350
 mag300 <- mag350 - 1   #magniture = 300
+mag250 <- mag300 - 1   #magniture = 250
+
 
 p005 <- c(79, 103, 127)  #mag = 350, pval = 0.05
 
 ltr_ha_long %>%
   filter(pset %in% mag400) %>%
   ggplot( aes(x=pset,y=ha,fill=year)) +
-         geom_bar(stat="identity",position="dodge")
-
-ltr_ha_long %>%
-  filter(pset %in% mag300) %>%
-  ggplot( aes(x=pset,y=ha,fill=year)) +
-         geom_bar(stat="identity",position="dodge")
-
+         geom_bar(stat="identity",position="dodge") +
+  facet_grid(.~grp) +
+  ggtitle("mag400")
 
 ltr_ha_long %>%
   filter(pset %in% mag350) %>%
   ggplot( aes(x=pset,y=ha,fill=year)) +
-         geom_bar(stat="identity",position="dodge")
+         geom_bar(stat="identity",position="dodge") +
+  facet_grid(.~grp) +
+  ggtitle("mag350")
+
+ltr_ha_long %>%
+  filter(pset %in% mag300) %>%
+  ggplot( aes(x=pset,y=ha,fill=year)) +
+         geom_bar(stat="identity",position="dodge") +
+  facet_grid(.~grp) +
+  ggtitle("mag300")
+
+ltr_ha_long %>%
+  filter(pset %in% mag250) %>%
+  ggplot( aes(x=pset,y=ha,fill=year)) +
+         geom_bar(stat="identity",position="dodge") +
+  facet_grid(.~grp) +
+  ggtitle("mag250")
 
 ltr_ha_long %>%
   filter(pset %in% p005) %>%
   ggplot( aes(x=pset,y=ha,fill=year)) +
-         geom_bar(stat="identity",position="dodge")
+         geom_bar(stat="identity",position="dodge") +
+  facet_grid(.~grp) +
+  ggtitle("p005")
 
 ```
 
